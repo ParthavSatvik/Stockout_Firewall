@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Brand: a deep indigo-violet pair -- "Firewall" protective/technical identity,
+     distinct from generic SaaS blue. */
+  --color-brand-50: #f1f0ff;
+  --color-brand-100: #e4e1ff;
+  --color-brand-200: #cac3ff;
+  --color-brand-300: #a79bff;
+  --color-brand-400: #8972ff;
+  --color-brand-500: #6d4fff;
+  --color-brand-600: #5b35f2;
+  --color-brand-700: #4c29cc;
+  --color-brand-800: #3d22a3;
+  --color-brand-900: #2f1d7d;
+
+  /* Signal accent used sparingly for "resilience/recovery" moments (badges, the
+     recovery animation, Digital Twin controls) -- warm against the cool brand. */
+  --color-signal-400: #fb923c;
+  --color-signal-500: #f97316;
+  --color-signal-600: #ea580c;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-slate-50);
+  color: var(--color-slate-900);
+  -webkit-font-smoothing: antialiased;
+}
+
+.dark body {
+  background-color: var(--color-slate-950);
+  color: var(--color-slate-100);
+}
+
+::selection {
+  background-color: var(--color-brand-200);
+}
+.dark ::selection {
+  background-color: var(--color-brand-800);
+}
+
+@keyframes recovery-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(249, 115, 22, 0); }
+}
+.animate-recovery-pulse {
+  animation: recovery-pulse 1.6s ease-out 2;
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.25s ease-out;
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: shimmer 1.4s infinite;
+}
+.dark .skeleton-shimmer::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+}

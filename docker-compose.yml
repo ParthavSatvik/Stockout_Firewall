@@ -1,0 +1,47 @@
+# Local full-stack environment. Not build-verified in this session (Docker CLI is not
+# installed on this development machine -- see BUILD_STATUS.md). Reviewed for correctness;
+# run `docker compose up --build` on a machine with Docker to validate before relying on it.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: stockout
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      APP_ENV: local
+      DEMO_MODE: "true"
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/stockout
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+      LOCAL_JWT_SECRET: local-dev-secret-change-me
+      PORT: "8080"
+    ports:
+      - "8000:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

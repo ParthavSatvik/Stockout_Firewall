@@ -1,0 +1,31 @@
+{
+  "runtime": "3.12.14",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "logical_cpus": 9,
+  "method": "FastAPI TestClient in-process, SQLite, 4 read threads; rate limiter disabled only in benchmark; not a network or production benchmark",
+  "dataset": "30 new one-SKU orders, 9 catalog products, 4 suppliers, 20 seeded offers; stock raised to 100000 synthetic units",
+  "recovery_runs": 30,
+  "workflow_duration_s": 5.739,
+  "recovery_latency": {
+    "p50_ms": 42.636,
+    "p95_ms": 61.678,
+    "p99_ms": 65.055
+  },
+  "baseline": {
+    "baseline_coverage_kg": 40,
+    "recovered_plan_coverage_kg": 100,
+    "delivered_kg": 0,
+    "cost_inr": 4244.76
+  },
+  "api_reads": 200,
+  "concurrency": 4,
+  "read_duration_s": 1.999,
+  "throughput_rps": 100.07,
+  "read_latency": {
+    "p50_ms": 16.278,
+    "p95_ms": 89.987,
+    "p99_ms": 337.692
+  },
+  "errors": 0,
+  "all_recovery_cases_passed": true
+}
