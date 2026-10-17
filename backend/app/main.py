@@ -2,10 +2,9 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 
 from app.config import get_settings
 from app.routers import (
@@ -27,7 +26,7 @@ from app.routers import (
 settings = get_settings()
 logging.basicConfig(level=settings.log_level)
 
-limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+from app.ratelimit import limiter  # noqa: E402
 
 app = FastAPI(title="Stockout Firewall API", version="0.1.0")
 app.state.limiter = limiter

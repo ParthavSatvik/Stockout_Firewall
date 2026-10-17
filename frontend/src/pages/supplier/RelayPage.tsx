@@ -1,3 +1,4 @@
+import { useT } from "../../lib/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Check, Clock, Workflow, X } from "lucide-react";
@@ -162,6 +163,7 @@ function OutgoingCard({ relay }: { relay: RelayView }) {
 }
 
 export function RelayPage() {
+  const { t } = useT();
   const [params] = useSearchParams();
   const focus = params.get("focus");
   const q = useQuery({ queryKey: ["relays"], queryFn: () => api.get<{ outgoing: RelayView[]; incoming: RelayView[] }>("/api/relays/mine"), refetchInterval: 8000 });
@@ -170,13 +172,13 @@ export function RelayPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader eyebrow="Supply Relay Protocol" title="Cover each other's shortfalls">
+      <PageHeader eyebrow="Supply Relay Protocol" title={t("sup.relayTitle")}>
         When a wholesaler can supply only part of an order, it hands the exact gap to eligible partners instead of leaving the merchant to start over.
         Partners quote; the merchant approves; stock is reserved only then.
       </PageHeader>
       <Tabs value={tab} onChange={setTab} items={[
-        { value: "incoming", label: "Requests to me", badge: pendingIncoming },
-        { value: "outgoing", label: "My relays", badge: q.data?.outgoing.filter((r) => r.status === "open").length },
+        { value: "incoming", label: t("sup.requestsToMe"), badge: pendingIncoming },
+        { value: "outgoing", label: t("sup.myRelays"), badge: q.data?.outgoing.filter((r) => r.status === "open").length },
       ]} />
       {q.isPending && <Spinner label="Loading relays…" />}
       {q.isError && <ErrorState message="Could not load relays." />}

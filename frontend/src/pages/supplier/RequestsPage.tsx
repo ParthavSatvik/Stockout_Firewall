@@ -1,3 +1,4 @@
+import { useT } from "../../lib/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, CircleSlash, Clock, Inbox, ShieldCheck, Workflow, XCircle } from "lucide-react";
@@ -31,6 +32,7 @@ function GuardIcon({ status }: { status: GuardAssessment["status"] }) {
 }
 
 function DecisionPanel({ alloc, onDone }: { alloc: Allocation; onDone: () => void }) {
+  const { t } = useT();
   const { toast } = useToast();
   // null = "use PromiseGuard's suggestion"; a string is the supplier's own edit.
   const [readyByEdit, setReadyBy] = useState<string | null>(null);
@@ -131,7 +133,7 @@ function DecisionPanel({ alloc, onDone }: { alloc: Allocation; onDone: () => voi
       <form className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-800" onSubmit={(e) => e.preventDefault()}>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label htmlFor="commit-qty">Quantity you will commit ({guard.unit})</Label>
+            <Label htmlFor="commit-qty">{t("sup.commitQty", { unit: guard.unit ?? "" })}</Label>
             <Input id="commit-qty" type="number" min={0} max={requested} step="any" inputMode="decimal" value={qtyText} onChange={(e) => setQtyText(e.target.value)} aria-describedby="qty-help" />
             <p id="qty-help" className="text-xs text-slate-500">
               Requested {qty(requested, guard.unit)} · safe maximum {qty(guard.max_feasible_qty, guard.unit)}
@@ -139,7 +141,7 @@ function DecisionPanel({ alloc, onDone }: { alloc: Allocation; onDone: () => voi
             </p>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="ready-by">Ready for dispatch by</Label>
+            <Label htmlFor="ready-by">{t("sup.readyBy")}</Label>
             <Input id="ready-by" type="datetime-local" value={readyBy} onChange={(e) => setReadyBy(e.target.value)} aria-describedby="ready-help" />
             <p id="ready-help" className="text-xs text-slate-500">Suggested {istTime(guard.suggested_ready_by)} IST — {guard.suggestion_basis}</p>
           </div>
@@ -175,23 +177,23 @@ function DecisionPanel({ alloc, onDone }: { alloc: Allocation; onDone: () => voi
 
         <div className="flex flex-wrap gap-2 pt-1">
           {validQty && rest <= 0 && (
-            <Button variant="success" disabled={busy || needsOverride || !readyIso || (override && overrideReason.trim().length < 3)} onClick={() => confirm.mutate()}>
-              <ShieldCheck className="h-4 w-4" aria-hidden /> Accept {qty(requested, guard.unit)}
+            <Button variant="success" className="h-auto min-h-9 whitespace-normal py-2 text-left" disabled={busy || needsOverride || !readyIso || (override && overrideReason.trim().length < 3)} onClick={() => confirm.mutate()}>
+              <ShieldCheck className="h-4 w-4" aria-hidden /> {t("sup.accept", { qty: qty(requested, guard.unit) })}
             </Button>
           )}
           {validQty && rest > 0 && (
             <>
-              <Button disabled={busy || needsOverride || relayReason.trim().length < 3 || (commitQty > 0 && !readyIso)} onClick={() => relay.mutate()}>
-                <Workflow className="h-4 w-4" aria-hidden /> {commitQty > 0 ? `Commit ${qty(commitQty)} + relay ${qty(rest, guard.unit)}` : `Relay all ${qty(rest, guard.unit)} to partners`}
+              <Button className="h-auto min-h-9 whitespace-normal py-2 text-left" disabled={busy || needsOverride || relayReason.trim().length < 3 || (commitQty > 0 && !readyIso)} onClick={() => relay.mutate()}>
+                <Workflow className="h-4 w-4" aria-hidden /> {commitQty > 0 ? t("sup.commitRelay", { qty: qty(commitQty), rest: qty(rest, guard.unit) }) : t("sup.relayAll", { rest: qty(rest, guard.unit) })}
               </Button>
               {commitQty > 0 && (
-                <Button variant="outline" disabled={busy || needsOverride || !readyIso} onClick={() => confirm.mutate()}>
-                  Commit {qty(commitQty)}, planner sources the rest
+                <Button variant="outline" className="h-auto min-h-9 whitespace-normal py-2 text-left" disabled={busy || needsOverride || !readyIso} onClick={() => confirm.mutate()}>
+                  {t("sup.commitPlanner", { qty: qty(commitQty) })}
                 </Button>
               )}
             </>
           )}
-          <Button variant="ghost" className="text-rose-700 dark:text-rose-400" disabled={busy} onClick={() => setRejectOpen(true)}>Decline</Button>
+          <Button variant="ghost" className="text-rose-700 dark:text-rose-400" disabled={busy} onClick={() => setRejectOpen(true)}>{t("sup.decline")}</Button>
         </div>
         <p className="flex items-center gap-1.5 text-xs text-slate-500">
           <Clock className="h-3 w-3" aria-hidden /> Quote valid until {istTime(alloc.confirmation_expires_at)} IST ({expiry.text}). Nothing is reserved until you confirm.
@@ -215,6 +217,7 @@ function DecisionPanel({ alloc, onDone }: { alloc: Allocation; onDone: () => voi
 }
 
 export function RequestsPage() {
+  const { t } = useT();
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const q = useQuery({ queryKey: ["supplier-allocations"], queryFn: () => api.get<Allocation[]>("/api/suppliers/me/allocations"), refetchInterval: 8000 });
@@ -230,14 +233,14 @@ export function RequestsPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader eyebrow="PromiseGuard" title="Incoming requests">
+      <PageHeader eyebrow="PromiseGuard" title={t("sup.requestsTitle")}>
         Each request is checked against what you can actually promise: stock on hand minus existing commitments and safety stock, your hours and your daily capacity.
       </PageHeader>
       {q.isPending && <Spinner label="Loading requests…" />}
       {q.isError && <ErrorState message="Could not load requests." />}
-      {q.data && pending.length === 0 && <EmptyState icon={<Inbox className="h-8 w-8" />} title="No requests awaiting a decision" hint="New merchant requests and relay-selected lines appear here." />}
+      {q.data && pending.length === 0 && <EmptyState icon={<Inbox className="h-8 w-8" />} title={t("sup.noRequests")} hint="New merchant requests and relay-selected lines appear here." />}
       {selected && (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
           <nav aria-label="Requests awaiting decision">
             <ul className="space-y-1.5">
               {pending.map((a) => {

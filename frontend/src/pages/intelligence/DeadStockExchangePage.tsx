@@ -99,7 +99,7 @@ export function DeadStockExchangePage() {
       {error && <ErrorState message="Could not load the exchange." />}
       {listings && listings.length === 0 && <EmptyState title="No surplus listed right now" />}
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {listings?.map((listing) => (
           <Card key={listing.id}>
             <CardHeader className="flex-row items-center justify-between space-y-0">

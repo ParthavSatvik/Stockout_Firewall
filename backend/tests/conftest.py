@@ -11,6 +11,7 @@ os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH.as_posix()}"
 os.environ["LOCAL_JWT_SECRET"] = "test-only-secret-at-least-32-bytes-long"
 os.environ["DEMO_MODE"] = "true"
 os.environ["CORS_ORIGINS"] = "http://localhost:5173"
+os.environ["LOGIN_RATE_LIMIT"] = "100000/minute"  # tests log in many times from one client
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useT } from "../lib/i18n";
 import { useNavigate } from "react-router-dom";
 import { ApiError, api, setSession } from "../lib/api";
 import { supabaseEnabled, supabaseSignIn } from "../lib/supabase";
@@ -21,6 +22,7 @@ const DEMO_ACCOUNTS: { label: string; email: string }[] = [
   { label: "Admin — Control Tower", email: "admin@example.com" },
 ];
 export function LoginPage() {
+  const { t } = useT();
   const [email, setEmail] = useState("merchant1@example.com");
   const [password, setPassword] = useState("demo1234");
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export function LoginPage() {
       login(resp.access_token, resp.role);
       navigate(resp.role === "merchant" ? "/merchant" : resp.role === "supplier" ? "/supplier" : "/admin");
     } catch (err) {
-      setError(err instanceof ApiError || err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof ApiError || err instanceof Error ? err.message : t("login.failed"));
     } finally {
       setLoading(false);
     }
@@ -56,16 +58,16 @@ export function LoginPage() {
     <div className="mx-auto max-w-sm mt-12">
       <Card>
         <CardHeader>
-          <CardTitle>Log in to Stockout Firewall</CardTitle>
+          <CardTitle>{t("login.title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="space-y-3" onSubmit={handleSubmit}>
             <div className="space-y-1">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("login.email")}</Label>
               <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("login.password")}</Label>
               <Input
                 id="password"
                 type="password"
@@ -76,12 +78,12 @@ export function LoginPage() {
             </div>
             {error && <p className="text-xs text-red-600">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in…" : "Sign in"}
+              {loading ? t("login.signingIn") : t("login.signIn")}
             </Button>
           </form>
 
           <div className="mt-5 border-t border-slate-100 pt-4">
-            <p className="text-xs text-slate-500 mb-2">Demo accounts (password: demo1234)</p>
+            <p className="text-xs text-slate-500 mb-2">{t("login.demoAccounts")}</p>
             <div className="space-y-1">
               {DEMO_ACCOUNTS.map((acc) => (
                 <button

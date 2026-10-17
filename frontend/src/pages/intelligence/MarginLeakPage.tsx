@@ -81,7 +81,7 @@ export function MarginLeakPage() {
         <EmptyState title="No selling prices recorded yet" hint="Add a selling price above to see your margin against the cheapest available supplier." />
       )}
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {data?.map((line) => (
           <Card key={line.product_id} className={line.is_leaking ? "border-rose-200 dark:border-rose-900" : ""}>
             <CardHeader className="flex-row items-center justify-between space-y-0">

@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell, RequireAuth } from "./components/AppShell";
 import { ToastProvider } from "./components/ui/toast";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { I18nProvider, useT } from "./lib/i18n";
 import { ThemeProvider } from "./lib/theme";
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard").then(m => ({ default: m.AdminDashboard })));
 const LoginPage = lazy(() => import("./pages/LoginPage").then(m => ({ default: m.LoginPage })));
@@ -26,6 +27,11 @@ const PriceIndexPage = lazy(() => import("./pages/intelligence/PriceIndexPage").
 const StockoutRadarPage = lazy(() => import("./pages/intelligence/StockoutRadarPage").then(m => ({ default: m.StockoutRadarPage })));
 const SurvivalModePage = lazy(() => import("./pages/intelligence/SurvivalModePage").then(m => ({ default: m.SurvivalModePage })));
 
+function LoadingPage() {
+  const { t } = useT();
+  return <p role="status">{t("common.loadingPage")}</p>;
+}
+
 function Home() {
   const { isAuthenticated, role } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
@@ -42,11 +48,12 @@ function Protected({ role, children }: { role: string; children: ReactNode }) {
 export default function App() {
   return (
     <ThemeProvider>
+      <I18nProvider>
       <ToastProvider>
         <BrowserRouter>
           <AuthProvider>
             <AppShell>
-              <Suspense fallback={<p role="status">Loading page…</p>}><Routes>
+              <Suspense fallback={<LoadingPage />}><Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<LoginPage />} />
 
@@ -81,6 +88,7 @@ export default function App() {
           </AuthProvider>
         </BrowserRouter>
       </ToastProvider>
+      </I18nProvider>
     </ThemeProvider>
   );
 }

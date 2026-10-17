@@ -151,7 +151,7 @@ export function AdminDashboard() {
         <StatCard icon={AlertTriangle} label="Infeasible plans" value={data.infeasible_plans} accent="bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400" />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Supplier network</CardTitle>

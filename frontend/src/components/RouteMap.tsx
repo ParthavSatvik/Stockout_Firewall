@@ -1,3 +1,4 @@
+import { useT } from "../lib/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import * as maplibregl from "maplibre-gl";
@@ -23,6 +24,7 @@ const COLOURS = ["#5b35f2", "#ea580c", "#059669", "#0284c7", "#db2777"];
 /** Map of the active plan: merchant, each supplier, and the road route where the routing
  *  service answered. Estimated legs are drawn dashed and labelled as estimates. */
 export default function RouteMap({ orderId }: { orderId: string }) {
+  const { t } = useT();
   const q = useQuery({ queryKey: ["routes", orderId], queryFn: () => api.get<RoutesResponse>(`/api/orders/${orderId}/routes`) });
   const el = useRef<HTMLDivElement>(null);
 
@@ -55,7 +57,7 @@ export default function RouteMap({ orderId }: { orderId: string }) {
   if (q.isError) return null;
   return (
     <Card>
-      <CardHeader><CardTitle>Delivery routes</CardTitle></CardHeader>
+      <CardHeader><CardTitle>{t("order.routes")}</CardTitle></CardHeader>
       <CardContent className="space-y-3">
         <div ref={el} className="h-72 w-full overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800" role="region" aria-label="Map of supplier delivery routes" />
         <ul className="space-y-1 text-sm">

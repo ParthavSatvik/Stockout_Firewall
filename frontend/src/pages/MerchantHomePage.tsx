@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useT } from "../lib/i18n";
 import { WhatsAppAlertsCard } from "../components/WhatsAppAlertsCard";
 import { Link } from "react-router-dom";
 import {
@@ -68,6 +69,7 @@ function KpiCard({
 }
 
 export function MerchantHomePage() {
+  const { t } = useT();
   const summaryQuery = useQuery({
     queryKey: ["dashboard-summary"],
     queryFn: () => api.get<DashboardSummary>("/api/intelligence/dashboard-summary"),
@@ -83,8 +85,8 @@ export function MerchantHomePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Command Center</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Your procurement health, in one view.</p>
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t("home.title")}</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{t("home.subtitle")}</p>
       </div>
 
       {summaryQuery.isLoading && (
@@ -97,39 +99,39 @@ export function MerchantHomePage() {
       {summaryQuery.data && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <KpiCard
-            icon={IndianRupee} label="Total procurement spend" value={formatINR(summaryQuery.data.total_spend)}
+            icon={IndianRupee} label={t("home.spend")} value={formatINR(summaryQuery.data.total_spend)}
             hint="Sum of the selected plan's total cost across every confirmed or fulfilled order."
           />
           <KpiCard
-            icon={TrendingUp} label="Estimated savings" value={formatINR(summaryQuery.data.estimated_savings)}
+            icon={TrendingUp} label={t("home.savings")} value={formatINR(summaryQuery.data.estimated_savings)}
             hint={summaryQuery.data.savings_basis} accent="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
           />
           <KpiCard
-            icon={Clock} label="Orders in progress" value={String(summaryQuery.data.orders_in_progress)}
+            icon={Clock} label={t("home.inProgress")} value={String(summaryQuery.data.orders_in_progress)}
             hint="Draft, planned, awaiting confirmation, or currently replanning."
           />
           <KpiCard
-            icon={ShieldCheck} label="Avg. supplier reliability"
-            value={summaryQuery.data.avg_supplier_reliability != null ? `${Math.round(summaryQuery.data.avg_supplier_reliability * 100)}%` : "No data yet"}
+            icon={ShieldCheck} label={t("home.reliability")}
+            value={summaryQuery.data.avg_supplier_reliability != null ? `${Math.round(summaryQuery.data.avg_supplier_reliability * 100)}%` : t("home.noData")}
             hint="Average reliability score across suppliers you've actually used, weighted by real commitment history."
           />
           <KpiCard
-            icon={RotateCcw} label="Recovery events (30d)" value={String(summaryQuery.data.recent_recovery_events)}
+            icon={RotateCcw} label={t("home.recovery")} value={String(summaryQuery.data.recent_recovery_events)}
             hint="Automatic replans triggered by a supplier rejection, short supply, or expired confirmation."
             accent="bg-signal-500/10 text-signal-600"
           />
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Action feed</CardTitle>
-            <CardDescription>What needs your attention right now, in priority order.</CardDescription>
+            <CardTitle>{t("home.actionFeed")}</CardTitle>
+            <CardDescription>{t("home.actionFeedDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1">
             {summaryQuery.data?.action_feed.length === 0 && (
-              <p className="py-6 text-center text-sm text-slate-400">Nothing needs your attention right now.</p>
+              <p className="py-6 text-center text-sm text-slate-400">{t("home.nothing")}</p>
             )}
             {summaryQuery.data?.action_feed.map((item, idx) => {
               const { icon: Icon, className } = SEVERITY_STYLE[item.severity];
@@ -151,8 +153,8 @@ export function MerchantHomePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Intelligence modules</CardTitle>
-            <CardDescription>Deterministic insight, never a fabricated prediction.</CardDescription>
+            <CardTitle>{t("home.modules")}</CardTitle>
+            <CardDescription>{t("home.modulesDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-0.5">
             {INTELLIGENCE_LINKS.map((link) => {
@@ -173,10 +175,10 @@ export function MerchantHomePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent orders</CardTitle>
+          <CardTitle>{t("home.recentOrders")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-1">
-          {recentOrders.length === 0 && <p className="py-4 text-center text-sm text-slate-400">No orders yet.</p>}
+          {recentOrders.length === 0 && <p className="py-4 text-center text-sm text-slate-400">{t("home.noOrders")}</p>}
           {recentOrders.map((order) => {
             const plan = order.plans.find((p) => p.is_selected);
             return (

@@ -22,7 +22,9 @@
   --color-signal-500: #f97316;
   --color-signal-600: #ea580c;
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto,
+    "Nirmala UI", "Noto Sans Devanagari", "Noto Sans Kannada", "Noto Sans Tamil", "Noto Sans Telugu", "Noto Sans Bengali",
+    "Kohinoor Devanagari", "Tamil Sangam MN", "Telugu Sangam MN", "Bangla Sangam MN", sans-serif;
 }
 
 html, body, #root {

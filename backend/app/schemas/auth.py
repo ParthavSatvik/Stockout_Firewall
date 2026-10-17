@@ -1,20 +1,29 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.models.core import UserRole
 
 
+def _lower(v: str) -> str:
+    return v.strip().lower()
+
+
+# Lengths mirror the database columns: PostgreSQL rejects longer values with a 500.
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
-    full_name: str
+    password: str = Field(min_length=8, max_length=256)
+    full_name: str = Field(min_length=1, max_length=200)
     role: UserRole
-    business_name: str
-    city: str
+    business_name: str = Field(min_length=1, max_length=200)
+    city: str = Field(min_length=1, max_length=100)
+
+    _email = field_validator("email")(_lower)
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(max_length=256)
+
+    _email = field_validator("email")(_lower)
 
 
 class TokenResponse(BaseModel):

@@ -37,8 +37,11 @@ def to_paise(amount_inr: float) -> int:
 
 
 def create_order(amount_paise: int, receipt: str, notes: dict) -> dict:
-    resp = httpx.post(f"{API}/orders", auth=_auth(), timeout=15.0,
-                      json={"amount": amount_paise, "currency": "INR", "receipt": receipt[:40], "notes": notes})
+    try:
+        resp = httpx.post(f"{API}/orders", auth=_auth(), timeout=15.0,
+                          json={"amount": amount_paise, "currency": "INR", "receipt": receipt[:40], "notes": notes})
+    except httpx.HTTPError as exc:  # timeouts / connection failures: provider outage, not our 500
+        raise RazorpayError(f"Razorpay unreachable ({exc.__class__.__name__}); try again shortly") from exc
     if resp.status_code >= 400:
         raise RazorpayError(f"Razorpay order creation failed ({resp.status_code})")
     return resp.json()

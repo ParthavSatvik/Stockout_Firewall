@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.core import MerchantProfile, SupplierProfile, User, UserRole
+from app.ratelimit import limiter, login_limit
 from app.schemas.auth import ContactUpdateRequest, CurrentUserResponse, LoginRequest, RegisterRequest, TokenResponse
 from app.security import create_local_access_token, get_current_user, hash_password, verify_password
 
@@ -16,7 +18,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenRe
         raise HTTPException(403, "Local registration is demo-only; use configured identity provider")
     if payload.role == UserRole.ADMIN:
         raise HTTPException(403, "Administrator accounts cannot self-register")
-    if db.query(User).filter(User.email == payload.email).first():
+    if db.query(User).filter(func.lower(User.email) == payload.email).first():
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
 
     user = User(
@@ -39,11 +41,12 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenRe
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+@limiter.limit(login_limit)
+def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     from app.config import get_settings
     if not get_settings().demo_mode:
         raise HTTPException(403, "Local login is demo-only")
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = db.query(User).filter(func.lower(User.email) == payload.email).first()  # legacy mixed-case rows
     if user is None or user.hashed_password is None or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     token = create_local_access_token(user.id, user.role.value)

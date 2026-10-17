@@ -21,6 +21,7 @@ from app.models.ops import Payment, PaymentProvider, PaymentStatus, ProviderEven
 from app.models.orders import AllocationStatus, Order, OrderItem, OrderStatus
 from app.providers import razorpay, sarvam, whatsapp
 from app.routers.orders import LOW_CONFIDENCE_THRESHOLD
+from app.security import get_current_user
 from app.services.notify import notify
 from app.services.parsing import parse_order_text
 from app.services.planning import create_initial_plans, get_selected_plan, select_plan
@@ -56,7 +57,7 @@ def _parse_result(text: str, db: Session) -> dict:
 # ------------------------------------------------------------------ status
 
 @router.get("/api/integrations/status")
-def integration_status() -> dict:
+def integration_status(_user: User = Depends(get_current_user)) -> dict:
     """What is configured. Configured is not the same as verified live; see BUILD_STATUS.md."""
     s = get_settings()
     return {
@@ -176,8 +177,11 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)) -> d
     raw = await request.body()
     if not razorpay.verify_webhook_signature(raw, request.headers.get("x-razorpay-signature", "")):
         raise HTTPException(400, "Invalid webhook signature")
-    body = await request.json()
-    event = body.get("event", "")
+    try:
+        body = await request.json()
+    except ValueError:
+        raise HTTPException(400, "Malformed webhook body") from None
+    event = body.get("event", "") if isinstance(body, dict) else ""
     event_id = request.headers.get("x-razorpay-event-id") or hashlib.sha256(raw).hexdigest()
     if not _record_event(db, "razorpay", event_id, event, {"event": event}):
         return {"ok": True, "duplicate": True}

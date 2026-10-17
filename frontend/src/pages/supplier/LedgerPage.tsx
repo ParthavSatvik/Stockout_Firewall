@@ -1,3 +1,4 @@
+import { useT } from "../../lib/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ClipboardCheck } from "lucide-react";
@@ -55,6 +56,7 @@ const ACTION_LABEL: Record<string, string> = {
 };
 
 export function LedgerPage() {
+  const { t } = useT();
   const [params, setParams] = useSearchParams();
   const counting = params.get("count");
   const q = useQuery({ queryKey: ["promise-ledger"], queryFn: () => api.get<PromiseLedger>("/api/suppliers/me/promise-ledger"), refetchInterval: 15_000 });
@@ -68,13 +70,13 @@ export function LedgerPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader eyebrow="Promise Intelligence Ledger" title="What you have, what you promised, what you can still promise">
+      <PageHeader eyebrow="Promise Intelligence Ledger" title={t("sup.ledgerTitle")}>
         Listed stock is not promisable stock. Every figure below is derived from your last physical count and your recorded commitments.
       </PageHeader>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>Stock positions</CardTitle>
+          <CardTitle>{t("sup.stockPositions")}</CardTitle>
           <span className="hidden text-xs text-slate-500 sm:block">free to promise = on hand − committed − safety stock</span>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -94,7 +96,7 @@ export function LedgerPage() {
                 <div className="flex items-center gap-3">
                   <PromiseEquation compact onHand={p.on_hand} committed={p.committed} safety={p.safety_stock} free={p.free_to_promise} unit={p.unit} />
                   <Button size="sm" variant="outline" onClick={() => setParams(counting === p.inventory_id ? {} : { count: p.inventory_id })} aria-expanded={counting === p.inventory_id}>
-                    <ClipboardCheck className="h-3.5 w-3.5" aria-hidden /> Count
+                    <ClipboardCheck className="h-3.5 w-3.5" aria-hidden /> {t("sup.count")}
                   </Button>
                 </div>
               </div>

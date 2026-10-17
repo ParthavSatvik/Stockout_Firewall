@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # Local auth fallback (demo/local only)
     local_jwt_secret: str = "change-me-locally-only"
     access_token_expire_minutes: int = 60 * 12
+    login_rate_limit: str = "10/minute"
 
     # Sarvam AI
     sarvam_api_key: str = ""

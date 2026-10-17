@@ -1,3 +1,4 @@
+import { useT } from "../../lib/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { MethodNote, PageHeader, Stat } from "../../components/supplier/parts";
 import { Badge } from "../../components/ui/badge";
@@ -17,6 +18,7 @@ const OUTCOMES: { key: string; label: string; cls: string }[] = [
 ];
 
 function MetricRow({ m }: { m: PassportMetric }) {
+  const { t } = useT();
   const measured = m.status === "measured";
   const good = measured && m.value !== null && (m.higher_is_better ? m.value >= 0.9 : m.value <= 0.05);
   const weak = measured && m.value !== null && (m.higher_is_better ? m.value < 0.75 : m.value > 0.15);
@@ -26,7 +28,7 @@ function MetricRow({ m }: { m: PassportMetric }) {
       <td className="pr-3 text-right">
         {measured
           ? <span className={cn("text-lg font-semibold tabular-nums", good && "text-emerald-700 dark:text-emerald-400", weak && "text-rose-700 dark:text-rose-400")}>{pct(m.value)}</span>
-          : <Badge variant="default">Insufficient history</Badge>}
+          : <Badge variant="default">{t("sup.insufficientHistory")}</Badge>}
       </td>
       <td className="text-right text-xs tabular-nums text-slate-500">{qty(m.numerator)} / {qty(m.denominator)}{!measured && <span className="block">{m.observations} of ≥ {m.min_sample} needed</span>}</td>
     </tr>
@@ -77,7 +79,7 @@ export function PassportView({ data }: { data: Passport }) {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card>
           <CardHeader><CardTitle>Strengths on record</CardTitle></CardHeader>
           <CardContent>{data.strengths.length ? <ul className="space-y-1 text-sm">{data.strengths.map((s) => <li key={s}>• {s}</li>)}</ul> : <p className="text-sm text-slate-500">None measurable yet.</p>}</CardContent>
@@ -101,10 +103,11 @@ export function PassportView({ data }: { data: Passport }) {
 }
 
 export function PassportPage() {
+  const { t } = useT();
   const q = useQuery({ queryKey: ["passport"], queryFn: () => api.get<Passport>("/api/suppliers/me/passport") });
   return (
     <div className="space-y-5">
-      <PageHeader eyebrow="Supplier Trust Passport" title={q.data ? q.data.supplier_name : "Trust Passport"}>
+      <PageHeader eyebrow={t("sup.passportTitle")} title={q.data ? q.data.supplier_name : t("nav.passport")}>
         Evidence merchants can inspect: what you committed, what you delivered, when, and at what price. No star rating; every rate shows its denominator.
       </PageHeader>
       {q.isPending && <SkeletonCard />}

@@ -1,3 +1,4 @@
+import { useT } from "../lib/i18n";
 import { useRef, useState } from "react";
 import { Mic, Square } from "lucide-react";
 import { api, ApiError } from "../lib/api";
@@ -10,6 +11,7 @@ interface TranscribeResponse { transcript: string; language_code: string | null;
 /** Records a short voice order and returns Sarvam's transcript. Never invents text:
  *  if speech-to-text is unavailable the merchant is told to type instead. */
 export function VoiceOrderButton({ onTranscript }: { onTranscript: (text: string, language: string | null) => void }) {
+  const { t } = useT();
   const [state, setState] = useState<"idle" | "recording" | "sending">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
@@ -58,13 +60,13 @@ export function VoiceOrderButton({ onTranscript }: { onTranscript: (text: string
   return (
     <div className="flex flex-wrap items-center gap-2">
       {state === "recording" ? (
-        <Button type="button" variant="destructive" onClick={stop}><Square className="h-4 w-4" aria-hidden />Stop recording</Button>
+        <Button type="button" variant="destructive" onClick={stop}><Square className="h-4 w-4" aria-hidden />{t("new.stop")}</Button>
       ) : (
         <Button type="button" variant="outline" onClick={start} disabled={state === "sending"}>
-          <Mic className="h-4 w-4" aria-hidden />{state === "sending" ? "Transcribing with Sarvam…" : "Speak order"}
+          <Mic className="h-4 w-4" aria-hidden />{state === "sending" ? t("new.transcribing") : t("new.speak")}
         </Button>
       )}
-      {state === "recording" && <span className="text-xs text-rose-600" role="status">Recording… up to {MAX_SECONDS}s</span>}
+      {state === "recording" && <span className="text-xs text-rose-600" role="status">{t("new.recording", { s: MAX_SECONDS })}</span>}
       {message && <span className="text-xs text-amber-700 dark:text-amber-400" role="alert">{message}</span>}
     </div>
   );

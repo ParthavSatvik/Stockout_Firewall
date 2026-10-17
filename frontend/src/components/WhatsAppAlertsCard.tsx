@@ -1,3 +1,4 @@
+import { useT } from "../lib/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { MessageCircle } from "lucide-react";
@@ -13,6 +14,7 @@ interface IntegrationStatus { twilio_whatsapp: boolean; whatsapp_inbound_verifia
 
 /** Opt-in for WhatsApp order updates. Messages are sent only with an explicit opt-in. */
 export function WhatsAppAlertsCard({ audience }: { audience: "merchant" | "supplier" }) {
+  const { t } = useT();
   const qc = useQueryClient();
   const { toast } = useToast();
   const me = useQuery({ queryKey: ["me"], queryFn: () => api.get<Me>("/api/auth/me") });
@@ -33,21 +35,21 @@ export function WhatsAppAlertsCard({ audience }: { audience: "merchant" | "suppl
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-2">
-        <CardTitle className="flex items-center gap-2"><MessageCircle className="h-4 w-4 text-emerald-600" aria-hidden />WhatsApp alerts</CardTitle>
-        {status.data && <Badge variant={status.data.twilio_whatsapp ? "success" : "warning"}>{status.data.twilio_whatsapp ? "Twilio connected" : "Twilio not configured"}</Badge>}
+        <CardTitle className="flex items-center gap-2"><MessageCircle className="h-4 w-4 text-emerald-600" aria-hidden />{t("wa.title")}</CardTitle>
+        {status.data && <Badge variant={status.data.twilio_whatsapp ? "success" : "warning"}>{status.data.twilio_whatsapp ? t("wa.connected") : t("wa.notConfigured")}</Badge>}
       </CardHeader>
       <CardContent className="space-y-2">
         <p className="text-xs text-slate-500 dark:text-slate-400">Get {what}</p>
         <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
           <div className="space-y-1">
-            <Label htmlFor={`wa-${audience}`}>WhatsApp number (with country code)</Label>
+            <Label htmlFor={`wa-${audience}`}>{t("wa.number")}</Label>
             <Input id={`wa-${audience}`} className="w-48" placeholder="+919876543210" inputMode="tel" value={phoneValue} onChange={(e) => setPhone(e.target.value.trim())} />
           </div>
           <label className="flex h-9 items-center gap-2 text-sm">
             <input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={optInValue} onChange={(e) => setOptIn(e.target.checked)} />
-            I agree to receive WhatsApp messages
+            {t("wa.agree")}
           </label>
-          <Button type="submit" size="sm" disabled={save.isPending}>Save</Button>
+          <Button type="submit" size="sm" disabled={save.isPending}>{t("common.save")}</Button>
         </form>
         {status.data && !status.data.twilio_whatsapp && <p className="text-[11px] text-amber-700 dark:text-amber-400">Your preference is stored, but no messages are sent until Twilio credentials are configured on the server.</p>}
       </CardContent>

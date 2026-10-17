@@ -1,3 +1,4 @@
+import { useT } from "../../lib/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { WhatsAppAlertsCard } from "../../components/WhatsAppAlertsCard";
 import { ArrowRight, CheckCircle2, Clock } from "lucide-react";
@@ -11,6 +12,7 @@ import { formatINR } from "../../lib/format";
 import { cn } from "../../lib/utils";
 
 function QueueRow({ item }: { item: QueueItem }) {
+  const { t } = useT();
   const due = countdown(item.deadline);
   return (
     <li className="flex gap-3 py-3">
@@ -27,7 +29,7 @@ function QueueRow({ item }: { item: QueueItem }) {
           )}
         </div>
         <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">{item.why}</p>
-        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400"><span className="font-medium">If ignored:</span> {item.consequence}</p>
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400"><span className="font-medium">{t("sup.ifIgnored")}</span> {item.consequence}</p>
       </div>
       {item.action && (
         <Link to={item.action.href} className="shrink-0 self-center rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
@@ -39,6 +41,7 @@ function QueueRow({ item }: { item: QueueItem }) {
 }
 
 export function CopilotPage() {
+  const { t } = useT();
   const q = useQuery({ queryKey: ["supplier-copilot"], queryFn: () => api.get<CopilotResponse>("/api/suppliers/me/copilot"), refetchInterval: 10_000 });
 
   if (q.isPending) return <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>;
@@ -50,12 +53,12 @@ export function CopilotPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader eyebrow="Commitment Copilot" title="What needs you now">
+      <PageHeader eyebrow="Commitment Copilot" title={t("sup.copilotTitle")}>
         Ranked from your recorded stock, commitments, deadlines and capacity. Every item says why, and what happens if you wait.
       </PageHeader>
 
       <section aria-labelledby="best-action" className="rounded-xl border border-brand-200 bg-brand-50/60 p-4 dark:border-brand-900 dark:bg-brand-950/30">
-        <p id="best-action" className="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-700 dark:text-brand-300">Best next action</p>
+        <p id="best-action" className="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-700 dark:text-brand-300">{t("sup.bestAction")}</p>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{best.title}</p>
@@ -70,14 +73,14 @@ export function CopilotPage() {
       </section>
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <Stat label="Requests to decide" value={awaiting} tone={awaiting ? "warn" : undefined} />
-        <Stat label="Commitments at risk" value={answers.at_risk_of_missing_dispatch.length} tone={answers.at_risk_of_missing_dispatch.length ? "bad" : undefined} />
-        <Stat label="SKUs short for new orders" value={answers.insufficient_stock_for_new_commitments.length} />
-        <Stat label="Relay requests for you" value={invites} hint="Demand you can serve" />
+        <Stat label={t("sup.requestsToDecide")} value={awaiting} tone={awaiting ? "warn" : undefined} />
+        <Stat label={t("sup.atRisk")} value={answers.at_risk_of_missing_dispatch.length} tone={answers.at_risk_of_missing_dispatch.length ? "bad" : undefined} />
+        <Stat label={t("sup.skusShort")} value={answers.insufficient_stock_for_new_commitments.length} />
+        <Stat label={t("sup.relayForYou")} value={invites} hint="Demand you can serve" />
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Action queue</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t("sup.actionQueue")}</CardTitle></CardHeader>
         <CardContent>
           {queue.length === 0
             ? <EmptyState title="Nothing needs attention" hint="No open requests, at-risk commitments, stale stock or relay requests." />
@@ -85,7 +88,7 @@ export function CopilotPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader><CardTitle>Which orders can I partly fill safely?</CardTitle></CardHeader>
           <CardContent>

@@ -37,7 +37,7 @@ class SupplierInventoryRead(BaseModel):
 
 class InventoryUpsertRequest(BaseModel):
     product_id: str
-    brand: str = "generic"
+    brand: str = Field(default="generic", min_length=1, max_length=100)
     pack_size: float = Field(gt=0, le=1000000, allow_inf_nan=False)
     pack_unit: str
     price_per_base_unit: float = Field(gt=0, le=1000000, allow_inf_nan=False)

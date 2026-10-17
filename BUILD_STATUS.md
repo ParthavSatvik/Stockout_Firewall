@@ -2,7 +2,29 @@
 
 # BUILD_STATUS
 
-## 2026-10-17 — Live integrations: what is verified, simulated or blocked
+## 2026-10-17 — QA audit and multilingual UI
+
+**Defects reproduced, fixed and regression-tested** (`backend/tests/test_audit_regressions.py`, `frontend/src/lib/i18n.test.tsx`):
+1. Orders in Kannada/Hindi/Tamil/Telugu/Bengali script parsed to nothing: unit words were English-only, `` fails after Indic vowel signs, and there were no native-script aliases. Fixed (NFC normalisation, Indic unit words, lookahead boundary, aliases via seed and an idempotent data migration `9c1e2a7d0f31`).
+2. `0 kg` was parsed as an order line. It is now reported as unmatched.
+3. Unbounded text fields (notes, input language, order text, names, invoice number, brand, preferred-supplier list) passed SQLite but would 500 on PostgreSQL (`VARCHAR` limits). They are now validated to the column sizes (422).
+4. Emails were case-sensitive: a mixed-case registration could not log in in lower case, case-variant duplicate accounts were allowed, and Supabase linking missed them. Emails are now normalised and matched case-insensitively for legacy rows.
+5. Regenerating plans kept the stale alternatives, and recovery later used the oldest run's price ceiling. Regeneration now replaces unapproved plans.
+6. No login throttling: per-IP `LOGIN_RATE_LIMIT` (default 10/minute) now returns 429.
+7. A Razorpay network outage raised a raw exception (500). It is now a 503 with a clear message.
+8. A signed webhook with a malformed body returned 500. It now returns 400.
+9. `/api/integrations/status` was public. It now requires authentication.
+10. Page grids had no mobile column base, so wide content forced horizontal scrolling (the order page scrolled sideways on desktop too). Fixed with `grid-cols-1`; long translated buttons wrap.
+11. Invisible tooltips still occupied layout and widened scroll areas. They are now removed from layout while hidden.
+12. The mobile menu button had no accessible name.
+
+**Verified unchanged by probing:** role isolation (supplier→merchant, merchant→admin and so on: 403), missing or garbage tokens (401), NaN amounts (422), unknown products, CORS (only configured origins echoed; tested).
+
+**Multilingual UI:** English, हिन्दी, ಕನ್ನಡ, தமிழ், తెలుగు, বাংলা, with a persistent selector (sidebar and login page) that sets `<html lang>`, English fallback, and Indic font fallbacks. 170 UI strings per language: navigation, shell, login, Command Center, New Order, order page headings and evidence, statuses, the supplier Copilot, Requests, Dispatch, Relay, Ledger, Passport, payments and WhatsApp alerts. TypeScript enforces that every language has every key; tests check placeholders, script coverage, switching and persistence. **Not translated:** server-generated explanations (PromiseGuard headlines, Copilot reasons, action-feed messages), the intelligence module pages' bodies, the admin Control Tower, and toasts/dialog body text. These fall back to English. Product names, units, prices and IDs are intentionally never translated. Translations were written for this build, not reviewed by native speakers.
+
+**Remaining risks:** when two suppliers fail at once, the second can act on a superseded allocation id and gets a 409 until the list refreshes (8 s); a replan can create a second request to the same supplier for the same product; there is no end-to-end (Playwright) suite; PostgreSQL behaviour is covered only by CI; the default rate limits are per-IP, so put the API behind a proxy that forwards real client IPs.
+
+: what is verified, simulated or blocked
 
 **No credentials were available in this session.** The keys referred to as "supplied in a previous
 message" are not in this workspace, and pasted keys must be treated as compromised anyway: rotate

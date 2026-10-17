@@ -1,3 +1,4 @@
+import { useT, type TKey } from "../../lib/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Clock, PackageCheck, PackageOpen, Truck, Workflow } from "lucide-react";
@@ -12,20 +13,21 @@ import { countdown, istTime, qty, type CommitmentRow, type DispatchBoard } from 
 import { cn } from "../../lib/utils";
 
 const COLUMNS = [
-  { key: "reserved", title: "Reserved", hint: "Stock held, not yet picked" },
-  { key: "picking", title: "Picking", hint: "Being weighed and packed" },
-  { key: "ready", title: "Ready", hint: "Waiting for the vehicle" },
-  { key: "dispatched", title: "Dispatched", hint: "On the way to the merchant" },
+  { key: "reserved", title: "sup.reserved", hint: "Stock held, not yet picked" },
+  { key: "picking", title: "sup.picking", hint: "Being weighed and packed" },
+  { key: "ready", title: "sup.ready", hint: "Waiting for the vehicle" },
+  { key: "dispatched", title: "sup.dispatched", hint: "On the way to the merchant" },
 ] as const;
 
-const NEXT: Record<string, { label: string; path: string; body?: object; icon: typeof Truck }> = {
-  reserved: { label: "Start picking", path: "stage", body: { stage: "picking" }, icon: PackageOpen },
-  picking: { label: "Mark ready", path: "stage", body: { stage: "ready" }, icon: PackageCheck },
-  ready: { label: "Dispatch", path: "dispatch", icon: Truck },
-  dispatched: { label: "Mark delivered", path: "deliver", icon: PackageCheck },
+const NEXT: Record<string, { label: TKey; path: string; body?: object; icon: typeof Truck }> = {
+  reserved: { label: "sup.startPicking", path: "stage", body: { stage: "picking" }, icon: PackageOpen },
+  picking: { label: "sup.markReady", path: "stage", body: { stage: "ready" }, icon: PackageCheck },
+  ready: { label: "sup.dispatch", path: "dispatch", icon: Truck },
+  dispatched: { label: "sup.markDelivered", path: "deliver", icon: PackageCheck },
 };
 
 function CommitmentCard({ row, onAdvance, onRelay, busy }: { row: CommitmentRow; onAdvance: () => void; onRelay: () => void; busy: boolean }) {
+  const { t } = useT();
   const due = countdown(row.ready_by);
   const next = NEXT[row.stage];
   const Icon = next?.icon ?? Truck;
@@ -43,14 +45,15 @@ function CommitmentCard({ row, onAdvance, onRelay, busy }: { row: CommitmentRow;
         </p>
       )}
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {next && <Button size="sm" variant={row.stage === "ready" ? "default" : "outline"} disabled={busy} onClick={onAdvance}><Icon className="h-3.5 w-3.5" aria-hidden />{next.label}</Button>}
-        {row.stage !== "dispatched" && <Button size="sm" variant="ghost" disabled={busy} onClick={onRelay} title="Report that you can no longer supply all of it"><Workflow className="h-3.5 w-3.5" aria-hidden />Relay gap</Button>}
+        {next && <Button size="sm" variant={row.stage === "ready" ? "default" : "outline"} disabled={busy} onClick={onAdvance}><Icon className="h-3.5 w-3.5" aria-hidden />{t(next.label)}</Button>}
+        {row.stage !== "dispatched" && <Button size="sm" variant="ghost" disabled={busy} onClick={onRelay} title="Report that you can no longer supply all of it"><Workflow className="h-3.5 w-3.5" aria-hidden />{t("sup.relayGap")}</Button>}
       </div>
     </li>
   );
 }
 
 export function DispatchPage() {
+  const { t } = useT();
   const qc = useQueryClient();
   const { toast } = useToast();
   const q = useQuery({ queryKey: ["dispatch-board"], queryFn: () => api.get<DispatchBoard>("/api/suppliers/me/dispatch-board"), refetchInterval: 10_000 });
@@ -70,14 +73,14 @@ export function DispatchPage() {
     onError: fail,
   });
 
-  if (q.isPending) return <div className="grid gap-3 md:grid-cols-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>;
+  if (q.isPending) return <div className="grid grid-cols-1 gap-3 md:grid-cols-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>;
   if (q.isError) return <ErrorState message="Could not load the dispatch board." />;
   const board = q.data;
   const load = board.capacity_kg_per_day ? board.due_today_kg / board.capacity_kg_per_day : 0;
 
   return (
     <div className="space-y-5">
-      <PageHeader eyebrow="Fulfilment" title="Dispatch readiness board"
+      <PageHeader eyebrow="Fulfilment" title={t("sup.dispatchTitle")}
         actions={
           <div className="w-full min-w-[14rem] sm:w-64" aria-label={`Due today ${board.due_today_kg} of ${board.capacity_kg_per_day} kilograms capacity`}>
             <div className="flex justify-between text-xs text-slate-600 dark:text-slate-300"><span>Due today (not dispatched)</span><span className="tabular-nums">{qty(board.due_today_kg)} / {qty(board.capacity_kg_per_day, "kg")}</span></div>
@@ -89,16 +92,16 @@ export function DispatchPage() {
         Commitments ordered by ready-by time. Advance each one as it moves; risk badges list the exact rule that fired.
       </PageHeader>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {COLUMNS.map((col) => {
           const rows = board.columns[col.key];
           return (
             <section key={col.key} aria-labelledby={`col-${col.key}`} className="rounded-xl bg-slate-50 p-2.5 dark:bg-slate-900/50">
               <header className="mb-2 px-1">
-                <h2 id={`col-${col.key}`} className="flex items-center justify-between text-sm font-semibold text-slate-800 dark:text-slate-200">{col.title}<span className="text-xs font-normal tabular-nums text-slate-500">{rows.length}</span></h2>
+                <h2 id={`col-${col.key}`} className="flex items-center justify-between text-sm font-semibold text-slate-800 dark:text-slate-200">{t(col.title)}<span className="text-xs font-normal tabular-nums text-slate-500">{rows.length}</span></h2>
                 <p className="text-[11px] text-slate-500">{col.hint}</p>
               </header>
-              {rows.length === 0 ? <p className="px-1 py-4 text-center text-xs text-slate-400">Nothing here</p> : (
+              {rows.length === 0 ? <p className="px-1 py-4 text-center text-xs text-slate-400">{t("sup.nothingHere")}</p> : (
                 <ul className="space-y-2">{rows.map((r) => (
                   <CommitmentCard key={r.allocation_id} row={r} busy={advance.isPending}
                     onAdvance={() => advance.mutate(r)}

@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { useT, type TKey } from "../lib/i18n";
 import { PayButton } from "../components/PayButton";
 import { RecoveryEvidence } from "../components/RecoveryEvidence";
 import { CommitmentTrail, RelayPanel } from "../components/RelayPanel";
@@ -22,19 +23,20 @@ import { ApiError, api } from "../lib/api";
 import { formatINR, timeAgo } from "../lib/format";
 import type { AllocationPlan, Order, ReconciliationResponse, ScenarioResult } from "../lib/types";
 
-const OBJECTIVE_LABEL: Record<string, string> = {
-  cheapest: "Cheapest",
-  fastest: "Fastest",
-  most_reliable: "Most reliable",
+const OBJECTIVE_LABEL: Record<string, TKey> = {
+  cheapest: "new.cheapest",
+  fastest: "new.fastest",
+  most_reliable: "new.mostReliable",
 };
 
 function PlanCard({
   plan, onSelect, selecting,
 }: { plan: AllocationPlan; onSelect: () => void; selecting: boolean }) {
+  const { t } = useT();
   return (
     <Card className={plan.is_selected ? "border-brand-500 ring-1 ring-brand-500" : ""}>
       <CardHeader className="flex-row items-center justify-between space-y-0">
-        <CardTitle>{OBJECTIVE_LABEL[plan.objective_profile]}</CardTitle>
+        <CardTitle>{t(OBJECTIVE_LABEL[plan.objective_profile])}</CardTitle>
         {plan.is_feasible ? <Badge variant="success">Feasible</Badge> : <Badge variant="danger">Partial / infeasible</Badge>}
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
@@ -128,6 +130,7 @@ function OrderTimeline({ order }: { order: Order }) {
 }
 
 export function OrderDetailPage() {
+  const { t } = useT();
   const { orderId } = useParams<{ orderId: string }>();
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -213,10 +216,10 @@ export function OrderDetailPage() {
   const isRecovering = order.status === "replanning" && !relayOpen;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="space-y-6 lg:col-span-2">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Order #{order.id.slice(0, 8)}</h1>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t("order.title", { id: order.id.slice(0, 8) })}</h1>
           <StatusBadge status={order.status} />
         </div>
 
@@ -240,7 +243,7 @@ export function OrderDetailPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Items requested</CardTitle>
+            <CardTitle>{t("order.itemsRequested")}</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
@@ -267,7 +270,7 @@ export function OrderDetailPage() {
         {!selectedPlan && latestPlans.length > 0 && (
           <div>
             <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Compare plans</h2>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               {latestPlans.map((p) => (
                 <PlanCard key={p.id} plan={p} selecting={selectMutation.isPending} onSelect={() => selectMutation.mutate(p.id)} />
               ))}
@@ -278,7 +281,7 @@ export function OrderDetailPage() {
         {selectedPlan && (
           <div className="space-y-3">
             <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              Active plan ({OBJECTIVE_LABEL[selectedPlan.objective_profile]}
+              Active plan ({t(OBJECTIVE_LABEL[selectedPlan.objective_profile])}
               {selectedPlan.replan_reason !== "initial" && <> — replanned after {selectedPlan.replan_reason.replace(/_/g, " ")}</>})
             </h2>
             <Card>
@@ -398,7 +401,7 @@ export function OrderDetailPage() {
       <div className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle>Order timeline</CardTitle>
+            <CardTitle>{t("order.timeline")}</CardTitle>
           </CardHeader>
           <CardContent>
             <OrderTimeline order={order} />

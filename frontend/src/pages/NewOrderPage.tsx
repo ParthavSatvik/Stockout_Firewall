@@ -1,3 +1,4 @@
+import { useT } from "../lib/i18n";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -25,6 +26,7 @@ interface DraftLine {
   substitution_allowed: boolean;
 }
 export function NewOrderPage() {
+  const { t } = useT();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: products } = useQuery({ queryKey: ["products"], queryFn: () => api.get<Product[]>("/api/products") });
@@ -93,17 +95,17 @@ export function NewOrderPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">New Order</h1>
+      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{t("new.title")}</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>1. Say or type what you need</CardTitle>
+          <CardTitle>{t("new.step1")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <textarea
             className="w-full rounded-lg border border-slate-300 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             rows={3}
-            placeholder="e.g. nanage 100 kg akki beku..."
+            placeholder={t("new.placeholder")}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
@@ -121,16 +123,16 @@ export function NewOrderPage() {
             ))}
           </div>
           <Button data-testid="parse-button" type="button" onClick={() => parseMutation.mutate()} disabled={!text || parseMutation.isPending}>
-            {parseMutation.isPending ? "Parsing…" : "Parse (deterministic lexicon, no LLM)"}
+            {parseMutation.isPending ? t("new.parsing") : t("new.parse")}
           </Button>
 
           {parseResult && (
             <div className="rounded-lg bg-slate-50 p-3 text-sm space-y-1 dark:bg-slate-800/60">
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Overall confidence: {(parseResult.overall_confidence * 100).toFixed(0)}%
+                {t("new.confidence", { pct: (parseResult.overall_confidence * 100).toFixed(0) })}
                 {parseResult.requires_confirmation && (
                   <Badge variant="warning" className="ml-2">
-                    Low confidence — please verify items below
+                    {t("new.lowConfidence")}
                   </Badge>
                 )}
               </p>
@@ -150,7 +152,7 @@ export function NewOrderPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>2. Basket</CardTitle>
+          <CardTitle>{t("new.step2")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {lines.length === 0 && <p className="text-sm text-slate-400 dark:text-slate-500">No items yet. Parse text above or add manually.</p>}
@@ -175,9 +177,9 @@ export function NewOrderPage() {
 
           <div className="flex items-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="flex-1 space-y-1">
-              <Label>Add product manually</Label>
+              <Label>{t("new.addManual")}</Label>
               <Select value={manualProductId} onChange={(e) => setManualProductId(e.target.value)}>
-                <option value="">Select product…</option>
+                <option value="">{t("new.selectProduct")}</option>
                 {products?.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} ({p.base_unit})
@@ -186,7 +188,7 @@ export function NewOrderPage() {
               </Select>
             </div>
             <div className="w-24 space-y-1">
-              <Label>Qty</Label>
+              <Label>{t("new.qty")}</Label>
               <Input type="number" value={manualQty} onChange={(e) => setManualQty(e.target.value)} />
             </div>
             <Button type="button" variant="outline" onClick={addManualLine}>
@@ -198,32 +200,32 @@ export function NewOrderPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>3. Merchant rules</CardTitle>
+          <CardTitle>{t("new.step3")}</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label>Default objective</Label>
+            <Label>{t("new.objective")}</Label>
             <Select value={objectiveProfile} onChange={(e) => setObjectiveProfile(e.target.value as ObjectiveProfile)}>
-              <option value="cheapest">Cheapest</option>
-              <option value="fastest">Fastest</option>
-              <option value="most_reliable">Most reliable</option>
+              <option value="cheapest">{t("new.cheapest")}</option>
+              <option value="fastest">{t("new.fastest")}</option>
+              <option value="most_reliable">{t("new.mostReliable")}</option>
             </Select>
           </div>
           <div className="space-y-1">
             <Label className="flex items-center gap-1">
-              Budget cap (₹, optional) <InfoHint text="A hard ceiling on total product cost. The optimizer will never exceed it, even if that means leaving part of the basket unfulfilled." />
+              {t("new.budget")} <InfoHint text="A hard ceiling on total product cost. The optimizer will never exceed it, even if that means leaving part of the basket unfulfilled." />
             </Label>
             <Input type="number" value={budgetCap} onChange={(e) => setBudgetCap(e.target.value)} placeholder="No limit" />
           </div>
           <div className="space-y-1">
             <Label className="flex items-center gap-1">
-              Price tolerance (% above cheapest) <InfoHint text="Suppliers priced more than this percentage above the cheapest eligible offer are excluded from consideration." />
+              {t("new.tolerance")} <InfoHint text="Suppliers priced more than this percentage above the cheapest eligible offer are excluded from consideration." />
             </Label>
             <Input type="number" value={priceTolerance} onChange={(e) => setPriceTolerance(Number(e.target.value))} />
           </div>
           <div className="space-y-1">
             <Label className="flex items-center gap-1">
-              Minimum supplier reliability (0-1) <InfoHint text="Suppliers with a lower real reliability score (from actual commitment history) are excluded, regardless of price." />
+              {t("new.minReliability")} <InfoHint text="Suppliers with a lower real reliability score (from actual commitment history) are excluded, regardless of price." />
             </Label>
             <Input
               type="number"
@@ -236,7 +238,7 @@ export function NewOrderPage() {
           </div>
           <div className="space-y-1">
             <Label className="flex items-center gap-1">
-              Max suppliers per order <InfoHint text="Caps how many distinct suppliers the optimizer will split this order across, to limit delivery complexity." />
+              {t("new.maxSuppliers")} <InfoHint text="Caps how many distinct suppliers the optimizer will split this order across, to limit delivery complexity." />
             </Label>
             <Input type="number" value={maxSuppliers} onChange={(e) => setMaxSuppliers(Number(e.target.value))} />
           </div>
@@ -251,7 +253,7 @@ export function NewOrderPage() {
           disabled={lines.length === 0 || createMutation.isPending}
           onClick={() => createMutation.mutate()}
         >
-          {createMutation.isPending ? <Spinner label="Creating…" /> : "Create order & compare plans"}
+          {createMutation.isPending ? <Spinner label="Creating…" /> : t("new.create")}
         </Button>
       </div>
     </div>

@@ -47,7 +47,7 @@ export function StockoutRadarPage() {
         <EmptyState title="Not enough order history yet" hint="Place a few orders for the same products to unlock reorder-risk estimates." />
       )}
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {data?.map((item) => (
           <Card key={item.product_id}>
             <CardHeader className="flex-row items-center justify-between space-y-0">

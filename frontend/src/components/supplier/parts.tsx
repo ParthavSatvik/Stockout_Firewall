@@ -1,3 +1,4 @@
+import { useT } from "../../lib/i18n";
 import type { ReactNode } from "react";
 import { Badge } from "../ui/badge";
 import { Tooltip } from "../ui/tooltip";
@@ -24,6 +25,7 @@ export function PageHeader({ eyebrow, title, children, actions }: { eyebrow?: st
 export function PromiseEquation({ onHand, committed, safety, free, unit, compact }: {
   onHand: number; committed: number; safety: number; free: number; unit: string; compact?: boolean;
 }) {
+  const { t } = useT();
   const term = (label: string, value: number, cls = "") => (
     <div className={cn("flex flex-col", compact ? "min-w-[3.5rem]" : "min-w-[4.5rem]")}>
       <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</span>
@@ -33,14 +35,14 @@ export function PromiseEquation({ onHand, committed, safety, free, unit, compact
   const op = (s: string) => <span className={cn("self-end pb-0.5 text-slate-400", compact ? "text-sm" : "text-lg")}>{s}</span>;
   return (
     <div className="flex flex-wrap items-end gap-x-2 gap-y-1" aria-label={`${onHand} on hand minus ${committed} committed minus ${safety} safety stock equals ${free} ${unit} free to promise`}>
-      {term("On hand", onHand)}
+      {term(t("sup.onHand"), onHand)}
       {op("−")}
-      {term("Committed", committed)}
+      {term(t("sup.committed"), committed)}
       {op("−")}
-      {term("Safety", safety)}
+      {term(t("sup.safety"), safety)}
       {op("=")}
       <div className={cn("flex flex-col rounded-md px-2 py-0.5", free > 0 ? "bg-emerald-100 dark:bg-emerald-950/60" : "bg-rose-100 dark:bg-rose-950/60")}>
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Free to promise</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{t("sup.freeToPromise")}</span>
         <span className={cn("tabular-nums font-bold", compact ? "text-sm" : "text-lg", free > 0 ? "text-emerald-800 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300")}>
           {qty(free, unit)}
         </span>

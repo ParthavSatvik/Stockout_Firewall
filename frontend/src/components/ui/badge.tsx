@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import type { HTMLAttributes } from "react";
+import { statusKey, useT } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
 
 const badgeVariants = cva("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", {
@@ -54,9 +55,11 @@ const STATUS_VARIANT: Record<string, "default" | "success" | "warning" | "danger
 const LIVE_STATUSES = new Set(["replanning", "awaiting_confirmation"]);
 
 export function StatusBadge({ status }: { status: string }) {
+  const { t } = useT();
+  const key = statusKey(status);
   return (
     <Badge variant={STATUS_VARIANT[status] ?? "default"} pulse={LIVE_STATUSES.has(status)}>
-      {status.replace(/_/g, " ")}
+      {key ? t(key) : status.replace(/_/g, " ")}
     </Badge>
   );
 }

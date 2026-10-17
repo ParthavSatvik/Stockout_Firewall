@@ -1,3 +1,4 @@
+import { useT } from "../lib/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Workflow } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -16,6 +17,7 @@ const INVITE_BADGE: Record<string, "default" | "success" | "warning" | "danger" 
 /** Merchant view of a supplier-initiated Supply Relay: partner quotes, the optimizer's
  *  preview under the order's own policy, and the approve / decline decision. */
 export function RelayPanel({ orderId, relays }: { orderId: string; relays: RelayView[] }) {
+  const { t } = useT();
   const qc = useQueryClient();
   const { toast } = useToast();
   const refresh = () => ["order", "evidence", "order-relays", "commitment-trail"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
@@ -40,7 +42,7 @@ export function RelayPanel({ orderId, relays }: { orderId: string; relays: Relay
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <CardTitle className="flex items-center gap-2"><Workflow className="h-4 w-4 text-brand-600" aria-hidden />Supply relay</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Workflow className="h-4 w-4 text-brand-600" aria-hidden />{t("order.relay")}</CardTitle>
             <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
               {relay.origin_supplier_name} committed {qty(relay.origin_committed_qty, relay.unit)} and asked partner wholesalers for the remaining {qty(relay.outstanding_qty, relay.unit)} {relay.product_name}.
             </p>
@@ -67,7 +69,7 @@ export function RelayPanel({ orderId, relays }: { orderId: string; relays: Relay
         {relay.status === "open" && pv && (
           pv.available ? (
             <div className="space-y-2 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">If you approve now</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t("order.ifApprove")}</p>
               {pv.lines && pv.lines.length > 0 ? (
                 <ul className="text-sm">{pv.lines.map((l) => <li key={l.supplier_name}>{l.supplier_name}: {qty(l.qty, relay.unit)} @ {formatINR(l.unit_price, true)} = {formatINR(l.line_cost)} · ready {istTime(l.ready_by)} IST</li>)}</ul>
               ) : <p className="text-sm text-rose-700 dark:text-rose-400">No partner quote fits your order's limits.</p>}
@@ -86,8 +88,8 @@ export function RelayPanel({ orderId, relays }: { orderId: string; relays: Relay
 
         {relay.status === "open" && (
           <div className="flex flex-wrap gap-2">
-            <Button disabled={!pv?.available || !pv.lines?.length || approve.isPending} onClick={() => approve.mutate(relay.id)}>Approve relay plan</Button>
-            <Button variant="outline" disabled={decline.isPending} onClick={() => decline.mutate(relay.id)}>Use open-market recovery instead</Button>
+            <Button disabled={!pv?.available || !pv.lines?.length || approve.isPending} onClick={() => approve.mutate(relay.id)}>{t("order.approveRelay")}</Button>
+            <Button variant="outline" disabled={decline.isPending} onClick={() => decline.mutate(relay.id)}>{t("order.openMarket")}</Button>
           </div>
         )}
         {relay.status !== "open" && relay.resolution_note && <p className="text-sm text-slate-600 dark:text-slate-300">{relay.resolution_note}</p>}
@@ -105,11 +107,12 @@ const TRAIL_LABEL: Record<string, string> = {
 };
 
 export function CommitmentTrail({ orderId }: { orderId: string }) {
+  const { t } = useT();
   const q = useQuery({ queryKey: ["commitment-trail", orderId], queryFn: () => api.get<LedgerEvent[]>(`/api/orders/${orderId}/commitment-ledger`), refetchInterval: 6000 });
   if (!q.data || q.data.length === 0) return null;
   return (
     <Card>
-      <CardHeader><CardTitle>Commitment trail</CardTitle></CardHeader>
+      <CardHeader><CardTitle>{t("order.trail")}</CardTitle></CardHeader>
       <CardContent>
         <ol className="space-y-1.5 text-sm">{q.data.map((e) => (
           <li key={e.id} className="flex flex-wrap gap-x-2">

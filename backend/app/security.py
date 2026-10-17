@@ -21,6 +21,7 @@ from datetime import UTC, datetime, timedelta
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -120,7 +121,7 @@ def get_current_user(
             if user is None and email and not claims.get("is_anonymous"):
                 # First Supabase sign-in of an existing account: link once, by email. This
                 # relies on Supabase "Confirm email" being enabled for the project.
-                user = db.query(User).filter(User.email == email, User.supabase_user_id.is_(None)).first()
+                user = db.query(User).filter(func.lower(User.email) == email, User.supabase_user_id.is_(None)).first()
                 if user is not None:
                     user.supabase_user_id = sub
                     db.commit()

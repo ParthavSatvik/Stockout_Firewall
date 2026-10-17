@@ -11,7 +11,7 @@ class OrderItemCreate(BaseModel):
     product_id: str
     requested_qty_base_unit: float = Field(gt=0, le=1000000, allow_inf_nan=False)
     substitution_allowed: bool = True
-    notes: str = ""
+    notes: str = Field(default="", max_length=300)
 
 
 class OrderCreate(BaseModel):
@@ -23,9 +23,9 @@ class OrderCreate(BaseModel):
     min_reliability: float = Field(default=0.6, ge=0, le=1)
     allow_substitution: bool = True
     max_suppliers: int = Field(default=4, ge=1, le=20)
-    preferred_supplier_ids: list[str] = []
-    raw_input_text: str = ""
-    raw_input_language: str = "en"
+    preferred_supplier_ids: list[str] = Field(default=[], max_length=20)
+    raw_input_text: str = Field(default="", max_length=5000)
+    raw_input_language: str = Field(default="en", max_length=10)
 
 
 class OrderItemRead(BaseModel):
@@ -173,7 +173,7 @@ class InvoiceItemCreate(BaseModel):
 
 class InvoiceCreate(BaseModel):
     order_id: str
-    invoice_number: str = ""
+    invoice_number: str = Field(default="", max_length=80)
     items: list[InvoiceItemCreate]
 
 

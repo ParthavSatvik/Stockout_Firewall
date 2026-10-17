@@ -27,6 +27,7 @@ from app.models.orders import (
     SupplierEventType,
 )
 from app.security import hash_password
+from app.services.native_aliases import NATIVE_SCRIPT_ALIASES
 from app.services.reliability import recompute_supplier_reliability
 
 DEMO_PASSWORD = "demo1234"
@@ -275,7 +276,7 @@ def run() -> None:
             product = Product(name=p["name"], category=p["category"], base_unit=p["base_unit"])
             db.add(product)
             db.flush()
-            for alias_text, lang in p["aliases"]:
+            for alias_text, lang in p["aliases"] + NATIVE_SCRIPT_ALIASES.get(p["name"], []):
                 db.add(ProductAlias(product_id=product.id, alias_text=alias_text, language=lang))
             products_by_name[p["name"]] = product
         db.flush()

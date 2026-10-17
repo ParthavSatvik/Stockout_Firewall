@@ -15,16 +15,27 @@ OrderCreate.parse_confidence / requires_confirmation in the orders router.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
 from app.models.catalog import Product, ProductAlias
 
+# Unit words in Kannada, Hindi, Tamil, Telugu and Bengali scripts, mapped to English units.
+NATIVE_UNITS = {
+    "ಕೆಜಿ": "kg", "ಕಿಲೋ": "kg", "ಲೀಟರ್": "litre",
+    "किलो": "kg", "केजी": "kg", "किग्रा": "kg", "लीटर": "litre",
+    "கிலோ": "kg", "லிட்டர்": "litre",
+    "కిలో": "kg", "కేజీ": "kg", "లీటర్": "litre",
+    "কেজি": "kg", "কিলো": "kg", "লিটার": "litre",
+}
 QUANTITY_UNIT_RE = re.compile(
     r"(?P<qty>\d+(?:\.\d+)?)\s*"
     r"(?P<unit>kg|kilo|kilos|kilogram|kilograms|g|gram|grams|litre|litres|liter|liters|l|"
-    r"piece|pieces|pc|pcs|packet|packets|bag|bags)\b",
+    r"piece|pieces|pc|pcs|packet|packets|bag|bags|" + "|".join(sorted(NATIVE_UNITS, key=len, reverse=True)) + ")"
+    # Not \b: Indic vowel signs are combining marks, so \b fails right after e.g. "ಕೆಜಿ".
+    r"(?!\w)",
     re.IGNORECASE,
 )
 
@@ -63,7 +74,7 @@ class ParseResult:
 
 def _load_alias_lexicon(db: Session) -> list[tuple[str, Product]]:
     rows = db.query(ProductAlias, Product).join(Product, ProductAlias.product_id == Product.id).all()
-    lexicon = [(alias.alias_text.lower(), product) for alias, product in rows]
+    lexicon = [(unicodedata.normalize("NFC", alias.alias_text).lower(), product) for alias, product in rows]
     # longest alias first so "basmati rice" matches before plain "rice"
     lexicon.sort(key=lambda t: -len(t[0]))
     return lexicon
@@ -80,12 +91,13 @@ def _find_product_near(window_text: str, lexicon: list[tuple[str, Product]]) -> 
 
 def parse_order_text(text: str, db: Session) -> ParseResult:
     lexicon = _load_alias_lexicon(db)
+    text = unicodedata.normalize("NFC", text)  # Indic text may arrive decomposed
     items: list[ParsedItem] = []
     unmatched: list[str] = []
 
     for match in QUANTITY_UNIT_RE.finditer(text):
-        qty_raw = float(match.group("qty"))
-        unit_raw = match.group("unit").lower()
+        qty_raw = float(match.group("qty"))  # float() accepts Indic digits such as ೧೦೦ / १००
+        unit_raw = NATIVE_UNITS.get(match.group("unit"), match.group("unit").lower())
         base_unit, multiplier = UNIT_TO_BASE.get(unit_raw, (unit_raw, 1.0))
         qty_base = qty_raw * multiplier
 
@@ -95,6 +107,9 @@ def parse_order_text(text: str, db: Session) -> ParseResult:
         window = " ".join(prefix[-WINDOW_WORDS_BEFORE:] + suffix[:WINDOW_WORDS_AFTER])
 
         product, alias, confidence = _find_product_near(window, lexicon)
+        if qty_base <= 0:
+            unmatched.append(match.group(0))  # a zero quantity is never an order line
+            continue
         if product is None:
             unmatched.append(match.group(0))
         items.append(

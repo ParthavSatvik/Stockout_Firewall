@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -17,8 +17,8 @@ LOW_CONFIDENCE_THRESHOLD = 0.75
 
 
 class ParseTextRequest(BaseModel):
-    text: str
-    language: str = "en"
+    text: str = Field(max_length=5000)
+    language: str = Field(default="en", max_length=10)
 
 
 @router.post("/parse-text")
@@ -117,6 +117,12 @@ def plan_order(
             status.HTTP_400_BAD_REQUEST,
             "Parsed order has low confidence and requires merchant confirmation of items before planning",
         )
+    # Regenerating replaces the previous (never-approved) alternatives, so recovery can't
+    # later read a stale price ceiling from an older run.
+    for old in list(order.plans):
+        db.delete(old)
+    db.flush()
+    db.expire(order, ["plans"])
     plans = create_initial_plans(db, order)
     db.commit()
     for p in plans:

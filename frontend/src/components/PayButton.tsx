@@ -1,3 +1,4 @@
+import { useT } from "../lib/i18n";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, ApiError } from "../lib/api";
@@ -27,6 +28,7 @@ function loadCheckout(): Promise<void> {
  *  order and the result counts only after the server verifies the signature; otherwise the
  *  clearly labelled simulated provider is used. */
 export function PayButton({ orderId }: { orderId: string }) {
+  const { t } = useT();
   const qc = useQueryClient();
   const { toast } = useToast();
   const [result, setResult] = useState<{ status: string; simulated: boolean; mode?: string } | null>(null);
@@ -72,11 +74,11 @@ export function PayButton({ orderId }: { orderId: string }) {
   return (
     <div className="space-y-2">
       <Button onClick={() => (live ? razorpay.mutate() : simulated.mutate())} disabled={busy || config.isPending}>
-        {busy ? "Processing payment…" : live ? `Pay with Razorpay${config.data?.mode === "test" ? " (test mode)" : ""}` : "Pay now (simulated)"}
+        {busy ? t("order.processing") : live ? `${t("order.payRazorpay")}${config.data?.mode === "test" ? " (test)" : ""}` : t("order.paySimulated")}
       </Button>
       {result && (
         <p className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-          Payment status: <StatusBadge status={result.status} />
+          {t("order.paymentStatus")} <StatusBadge status={result.status} />
           {result.simulated ? <Badge variant="info">Simulated — no money moved</Badge> : <Badge variant={result.mode === "live" ? "success" : "info"}>Razorpay {result.mode}</Badge>}
         </p>
       )}
