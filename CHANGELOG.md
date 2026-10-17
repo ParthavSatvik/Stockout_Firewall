@@ -12,3 +12,4 @@
 - Safe demo seed guard; FK enforcement; test concurrency/rollback; lazy frontend pages; frontend component tests; CI workflow and benchmark script.
 - Add audit, requirements, architecture, differentiation, impact, benchmark, test and demo documentation.
 - Correct environment example to use SQLite by default and the installed psycopg v3 driver for optional PostgreSQL; align existing CI with locked dependencies and current runtime versions.
+- Return all API timestamps as timezone-aware UTC (SQLite drops tzinfo, which made browsers outside UTC show times shifted by their offset, e.g. a new order as "6h ago" in IST); add regression test.

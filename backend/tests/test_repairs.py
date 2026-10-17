@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -201,3 +202,13 @@ def test_low_confidence_basket_can_be_reviewed(client):
     assert client.post(f"/api/orders/{order['id']}/plan", headers=h).status_code == 400
     assert client.post(f"/api/orders/{order['id']}/confirm-items", headers=h).status_code == 200
     assert client.post(f"/api/orders/{order['id']}/plan", headers=h).status_code == 200
+
+
+def test_api_timestamps_carry_utc_offset(client):
+    # SQLite drops tzinfo; without an explicit offset browsers parse UTC as local time.
+    order, h = new_order(client)
+    r = client.get(f"/api/orders/{order['id']}", headers=h)
+    assert r.status_code == 200, r.text
+    created = datetime.fromisoformat(r.json()['created_at'])
+    assert created.utcoffset() == timedelta(0)
+    assert abs(datetime.now(UTC) - created) < timedelta(minutes=5)

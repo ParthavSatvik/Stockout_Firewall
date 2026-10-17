@@ -3,11 +3,11 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Enum, Float, ForeignKey, Integer, String
+from sqlalchemy import JSON, Enum, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin, utcnow
+from app.models.base import TimestampMixin, UTCDateTime, UUIDPrimaryKeyMixin, utcnow
 
 
 class PaymentStatus(str, enum.Enum):
@@ -70,7 +70,7 @@ class ReceiptRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     allocation_id: Mapped[str] = mapped_column(ForeignKey("allocations.id"))
     product_id: Mapped[str] = mapped_column(ForeignKey("products.id"))
     received_qty_base_unit: Mapped[float] = mapped_column(Float)
-    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    received_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
 
 
 class Notification(Base, UUIDPrimaryKeyMixin, TimestampMixin):

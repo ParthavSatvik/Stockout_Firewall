@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String
+from sqlalchemy import Boolean, Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin, utcnow
+from app.models.base import TimestampMixin, UTCDateTime, UUIDPrimaryKeyMixin, utcnow
 from app.models.core import MerchantProfile, SupplierProfile
 
 
@@ -67,7 +67,7 @@ class PriceObservation(Base, UUIDPrimaryKeyMixin):
     supplier_id: Mapped[str] = mapped_column(ForeignKey("supplier_profiles.id"), index=True)
     product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), index=True)
     price_per_base_unit: Mapped[float] = mapped_column(Float)
-    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    observed_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
 
 
 class SurplusListing(Base, UUIDPrimaryKeyMixin, TimestampMixin):

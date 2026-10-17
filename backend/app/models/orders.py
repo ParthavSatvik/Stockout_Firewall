@@ -3,11 +3,11 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import TimestampMixin, UTCDateTime, UUIDPrimaryKeyMixin
 
 
 class ObjectiveProfile(str, enum.Enum):
@@ -140,9 +140,9 @@ class Allocation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Enum(AllocationStatus), default=AllocationStatus.PROPOSED, index=True
     )
     confirmed_qty_base_unit: Mapped[float | None] = mapped_column(Float, nullable=True)
-    confirmed_ready_by: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    confirmed_ready_by: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     confirmation_expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
     route_distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
     route_duration_minutes: Mapped[float | None] = mapped_column(Float, nullable=True)
