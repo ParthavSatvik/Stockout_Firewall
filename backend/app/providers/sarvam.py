@@ -50,3 +50,31 @@ def transcribe(audio_bytes: bytes, filename: str, language_code: str = "unknown"
         language_probability=body.get("language_probability"),
         request_id=body.get("request_id", ""),
     )
+
+
+CHAT_MODEL = "sarvam-105b"  # docs.sarvam.ai/api-reference/chat/chat-completions-v1 (checked 2026-10-17)
+
+
+def extract_order_items(text: str, product_names: list[str]) -> list[dict]:
+    """LLM assist for free-text orders the deterministic parser could not read.
+    Returns [{"product": <one of product_names>, "quantity": float, "unit": str}].
+    The caller must validate every item and require merchant confirmation."""
+    import json
+
+    if not settings.sarvam_configured:
+        raise SarvamNotConfiguredError("SARVAM_API_KEY is not configured")
+    system = ("You extract wholesale grocery order lines from Indian shopkeepers' messages, which may mix English, Hindi, "
+              "Kannada, Tamil, Telugu or Bengali in any script. Reply with JSON only: "
+              '{"items":[{"product":"<exact name from the list>","quantity":<number>,"unit":"kg|litre|piece"}]}. '
+              "Use only these product names: " + ", ".join(product_names) + ". Skip anything not in the list. Never guess quantities.")
+    resp = httpx.post(
+        f"{settings.sarvam_base_url}/v1/chat/completions",
+        headers={"api-subscription-key": settings.sarvam_api_key, "Authorization": f"Bearer {settings.sarvam_api_key}"},
+        json={"model": CHAT_MODEL, "temperature": 0, "max_tokens": 400, "response_format": {"type": "json_object"},
+              "messages": [{"role": "system", "content": system}, {"role": "user", "content": text[:2000]}]},
+        timeout=30.0,
+    )
+    resp.raise_for_status()
+    content = resp.json()["choices"][0]["message"].get("content") or "{}"
+    data = json.loads(content)
+    return data.get("items", []) if isinstance(data, dict) else []

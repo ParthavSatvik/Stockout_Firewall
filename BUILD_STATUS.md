@@ -2,6 +2,17 @@
 
 # BUILD_STATUS
 
+## 2026-10-17 — Demo completeness pass
+
+* **Dead-Stock Exchange (both sides).** Root cause: the offer form was shown on your own listings, the server rightly refused (400), and the UI had no error handler, so the click silently failed; listers also had no way to see or accept offers. The page now has a Market tab (offer, see your offer's status, revise it) and a Your-listings tab (incoming offers, Accept/Decline); the offer quantity is capped at the listing; a repeat offer updates instead of duplicating; both parties are notified.
+* **Merchant Inventory & Pricing** (`/merchant/market`): every supplier's free-to-promise stock (never safety stock or stock promised to others), price, MOQ, count freshness and reliability; "cheapest" counts only listings the planner can use.
+* **Wholesale Price Index**: the seed had no price history; it now has 26 weeks of supplier quotes, and the page opens on the first product.
+* **Rich demo seed for merchant1**: buying history across 6 products with realistic cadences (Autopilot and Stockout Radar have due items), cash on hand, selling prices (one thin margin), and Dead-Stock listings with offers in both directions. merchant2 stays the empty "new shop" fixture.
+* **Pay now (simulated)**: realistic checkout (UPI / test card / net banking, authorising step, receipt with transaction, gateway and bank references, payment history); `failure@upi` or test card …0002 shows the decline path. Labelled TEST MODE; only test instruments are accepted; no money moves.
+* **WhatsApp**: a phone-style thread shows every message the app sends, each with its real status (sent / failed / not sent and why). A demo-only simulator runs the exact webhook order logic (order → plan → "YES" → confirmed). This also fixed a crash where an unrecognised product created an order line with no product. **Real delivery still requires Twilio credentials** in `backend/.env`.
+* **Sarvam**: the LLM assist (`/v1/chat/completions`, `sarvam-105b`, JSON mode) runs only when the deterministic parser finds nothing or is unsure; every line is validated against the catalogue and always needs merchant confirmation. Speech-to-text uses Sarvam when `SARVAM_API_KEY` is set, otherwise the browser's speech recognition (Chrome/Edge, language from the UI selector). **Both Sarvam paths are unit-tested with stubs; neither has been called live (no key).**
+* Checks: 99 backend tests, 10 frontend tests, lint (fast-refresh hints only), type check and build all pass.
+
 ## 2026-10-17 — QA audit and multilingual UI
 
 **Defects reproduced, fixed and regression-tested** (`backend/tests/test_audit_regressions.py`, `frontend/src/lib/i18n.test.tsx`):

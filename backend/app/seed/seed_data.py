@@ -27,6 +27,7 @@ from app.models.orders import (
     SupplierEventType,
 )
 from app.security import hash_password
+from app.seed.demo_data import seed_buying_history, seed_dead_stock, seed_price_history
 from app.services.native_aliases import NATIVE_SCRIPT_ALIASES
 from app.services.reliability import recompute_supplier_reliability
 
@@ -331,6 +332,9 @@ def run() -> None:
             if not outcomes:
                 continue
             _seed_history(db, demo_merchant, suppliers_by_name[supplier_name], products_by_name["Rice"], outcomes)
+        seed_price_history(db)
+        seed_buying_history(db, merchants_by_email["merchant1@example.com"], products_by_name)
+        seed_dead_stock(db, merchants_by_email, suppliers_by_name, products_by_name)
         _seed_promise_scenario(db, merchants_by_email["merchant3@example.com"], suppliers_by_name["Anand Wholesale Grains"],
                                products_by_name["Wheat Atta"])
 

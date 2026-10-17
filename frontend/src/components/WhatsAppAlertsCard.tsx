@@ -8,6 +8,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input, Label } from "./ui/input";
 import { useToast } from "./ui/toast";
+import { WhatsAppThread } from "./WhatsAppThread";
 
 interface Me { phone_e164: string | null; whatsapp_opt_in: boolean }
 interface IntegrationStatus { twilio_whatsapp: boolean; whatsapp_inbound_verifiable: boolean }
@@ -52,6 +53,7 @@ export function WhatsAppAlertsCard({ audience }: { audience: "merchant" | "suppl
           <Button type="submit" size="sm" disabled={save.isPending}>{t("common.save")}</Button>
         </form>
         {status.data && !status.data.twilio_whatsapp && <p className="text-[11px] text-amber-700 dark:text-amber-400">Your preference is stored, but no messages are sent until Twilio credentials are configured on the server.</p>}
+        <WhatsAppThread />
       </CardContent>
     </Card>
   );

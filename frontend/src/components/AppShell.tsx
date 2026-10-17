@@ -62,6 +62,7 @@ const MERCHANT_NAV: NavGroup[] = [
       { to: "/merchant", label: "nav.commandCenter", icon: LayoutDashboard },
       { to: "/merchant/orders", label: "nav.orders", icon: ShoppingCart },
       { to: "/merchant/new", label: "nav.newOrder", icon: PlusCircle },
+      { to: "/merchant/market", label: "nav.inventory", icon: Boxes },
     ],
   },
   {

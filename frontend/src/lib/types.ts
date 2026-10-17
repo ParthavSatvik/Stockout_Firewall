@@ -176,13 +176,15 @@ export interface ReconciliationResponse {
 export interface Payment {
   id: string;
   order_id: string;
-  provider: "simulated" | "paytm";
+  provider: "simulated" | "paytm" | "razorpay";
   amount: number;
   currency: string;
   status: "pending" | "success" | "failed";
   provider_order_id: string;
   provider_txn_id: string | null;
   is_simulated: boolean;
+  created_at?: string | null;
+  raw_provider_response?: Record<string, unknown>;
 }
 
 export interface HealthResponse {

@@ -69,7 +69,7 @@ def test_survival_mode_respects_budget_and_priority(client):
 
 
 def test_cash_cycle_requires_explicit_input(client):
-    token = login(client, "merchant1@example.com")
+    token = login(client, "merchant2@example.com")  # merchant1 has seeded demo cash; merchant2 has none
     resp = client.get("/api/intelligence/cash-cycle", headers=auth_headers(token))
     assert resp.status_code == 200
     assert resp.json()["status"] == "no_cash_input"
@@ -82,7 +82,7 @@ def test_cash_cycle_requires_explicit_input(client):
 
 
 def test_margin_leak_detector_computes_traceable_margin(client):
-    token = login(client, "merchant1@example.com")
+    token = login(client, "merchant2@example.com")  # merchant1 has seeded selling prices
     rice_id = _rice_id(client)
 
     empty = client.get("/api/intelligence/margin-leak", headers=auth_headers(token))
@@ -167,5 +167,8 @@ def test_dead_stock_exchange_listing_offer_accept_flow(client):
     assert accept.status_code == 200
     assert accept.json()["status"] == "accepted"
 
-    still_listed = client.get("/api/catalog/surplus", headers=auth_headers(merchant_token))
-    assert not any(item["id"] == listing["id"] for item in still_listed.json())  # matched, no longer open
+    # Matched: no longer on the open market for anyone else; the lister still sees the outcome.
+    own_view = client.get("/api/catalog/surplus", headers=auth_headers(merchant_token)).json()
+    assert next(item for item in own_view if item["id"] == listing["id"])["status"] == "matched"
+    outsider = client.get("/api/catalog/surplus", headers=auth_headers(login(client, "merchant2@example.com"))).json()
+    assert not any(item["id"] == listing["id"] for item in outsider)

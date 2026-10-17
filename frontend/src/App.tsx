@@ -9,6 +9,7 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard").then(m => ({ 
 const LoginPage = lazy(() => import("./pages/LoginPage").then(m => ({ default: m.LoginPage })));
 const MerchantHomePage = lazy(() => import("./pages/MerchantHomePage").then(m => ({ default: m.MerchantHomePage })));
 const MerchantOrdersPage = lazy(() => import("./pages/MerchantOrdersPage").then(m => ({ default: m.MerchantOrdersPage })));
+const MarketInventoryPage = lazy(() => import("./pages/MarketInventoryPage").then(m => ({ default: m.MarketInventoryPage })));
 const NewOrderPage = lazy(() => import("./pages/NewOrderPage").then(m => ({ default: m.NewOrderPage })));
 const OrderDetailPage = lazy(() => import("./pages/OrderDetailPage").then(m => ({ default: m.OrderDetailPage })));
 const CopilotPage = lazy(() => import("./pages/supplier/CopilotPage").then(m => ({ default: m.CopilotPage })));
@@ -59,6 +60,7 @@ export default function App() {
 
                 <Route path="/merchant" element={<Protected role="merchant"><MerchantHomePage /></Protected>} />
                 <Route path="/merchant/orders" element={<Protected role="merchant"><MerchantOrdersPage /></Protected>} />
+                <Route path="/merchant/market" element={<Protected role="merchant"><MarketInventoryPage /></Protected>} />
                 <Route path="/merchant/new" element={<Protected role="merchant"><NewOrderPage /></Protected>} />
                 <Route path="/merchant/orders/:orderId" element={<Protected role="merchant"><OrderDetailPage /></Protected>} />
                 <Route path="/merchant/intelligence/stockout-radar" element={<Protected role="merchant"><StockoutRadarPage /></Protected>} />

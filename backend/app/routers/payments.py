@@ -42,6 +42,14 @@ def initiate_payment(
     is_simulated = not hasattr(provider, "mid")
     idempotency_key = f"{order.id}:{uuid.uuid4().hex[:8]}"
     result = provider.initiate(order.id, plan.total_cost, merchant.user_id)
+    if is_simulated:
+        # Documented test instruments: "failure@upi" (or a test card ending 0002) declines.
+        declined = payload.instrument.strip().lower() == "failure@upi" or payload.instrument.endswith("0002")
+        if declined:
+            result.status, result.provider_txn_id = "failed", None
+        result.raw_response = {**result.raw_response, "method": payload.method, "instrument": payload.instrument[:60],
+                               "declined": declined or result.raw_response.get("declined", False),
+                               "bank_reference": f"SIMRRN{uuid.uuid4().int % 10**12:012d}" if result.status == "success" else None}
 
     payment = Payment(
         order_id=order.id,
@@ -57,9 +65,21 @@ def initiate_payment(
         is_simulated=result.is_simulated,
     )
     db.add(payment)
+    from app.services.notify import notify
+    if payment.status == PaymentStatus.SUCCESS:
+        notify(db, merchant.user_id, "payment", "Payment received (simulated)",
+               f"Order #{order.id[:8]}: simulated payment of Rs.{payment.amount:,.2f} via {payload.method.upper()} succeeded. No money moved.", order.id)
     db.commit()
     db.refresh(payment)
     return payment
+
+
+@router.get("/order/{order_id}", response_model=list[PaymentRead])
+def order_payments(order_id: str, db: Session = Depends(get_db), merchant: MerchantProfile = Depends(get_merchant_profile)) -> list[Payment]:
+    order = db.get(Order, order_id)
+    if order is None or order.merchant_id != merchant.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
+    return db.query(Payment).filter(Payment.order_id == order.id).order_by(Payment.created_at.desc()).all()
 
 
 @router.get("/{payment_id}", response_model=PaymentRead)

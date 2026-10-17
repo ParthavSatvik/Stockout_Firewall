@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, ApiError } from "../lib/api";
 import type { Payment } from "../lib/types";
 import { Badge, StatusBadge } from "./ui/badge";
+import { SimulatedCheckout } from "./SimulatedCheckout";
 import { Button } from "./ui/button";
 import { useToast } from "./ui/toast";
 
@@ -27,7 +28,7 @@ function loadCheckout(): Promise<void> {
 /** Pays the approved plan. With Razorpay configured the amount comes from a server-created
  *  order and the result counts only after the server verifies the signature; otherwise the
  *  clearly labelled simulated provider is used. */
-export function PayButton({ orderId }: { orderId: string }) {
+export function PayButton({ orderId, amount }: { orderId: string; amount: number }) {
   const { t } = useT();
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -35,11 +36,9 @@ export function PayButton({ orderId }: { orderId: string }) {
   const config = useQuery({ queryKey: ["payment-config"], queryFn: () => api.get<PayConfig>("/api/payments/config") });
   const fail = (e: unknown) => toast({ title: "Payment not completed", description: e instanceof Error ? e.message : "Request failed", variant: "error" });
 
-  const simulated = useMutation({
-    mutationFn: () => api.post<Payment>("/api/payments/initiate", { order_id: orderId }),
-    onSuccess: (p) => { setResult({ status: p.status, simulated: true }); qc.invalidateQueries({ queryKey: ["order", orderId] }); },
-    onError: fail,
-  });
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const history = useQuery({ queryKey: ["payments", orderId], queryFn: () => api.get<Payment[]>(`/api/payments/order/${orderId}`) });
+  const paid = history.data?.some((p) => p.status === "success");
 
   const razorpay = useMutation({
     mutationFn: async () => {
@@ -70,12 +69,28 @@ export function PayButton({ orderId }: { orderId: string }) {
   });
 
   const live = config.data?.provider === "razorpay";
-  const busy = simulated.isPending || razorpay.isPending;
+  const busy = razorpay.isPending;
   return (
     <div className="space-y-2">
-      <Button onClick={() => (live ? razorpay.mutate() : simulated.mutate())} disabled={busy || config.isPending}>
+      {!paid && <Button onClick={() => (live ? razorpay.mutate() : setCheckoutOpen(true))} disabled={busy || config.isPending}>
         {busy ? t("order.processing") : live ? `${t("order.payRazorpay")}${config.data?.mode === "test" ? " (test)" : ""}` : t("order.paySimulated")}
-      </Button>
+      </Button>}
+      {checkoutOpen && <SimulatedCheckout orderId={orderId} amount={amount} onClose={() => setCheckoutOpen(false)}
+        onPaid={() => { qc.invalidateQueries({ queryKey: ["payments", orderId] }); qc.invalidateQueries({ queryKey: ["order", orderId] }); }} />}
+      {history.data && history.data.length > 0 && (
+        <ul className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
+          {history.data.map((p) => (
+            <li key={p.id} className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={p.status} />
+              <span className="tabular-nums">₹{p.amount.toFixed(2)}</span>
+              <span>{String(p.raw_provider_response?.method ?? p.provider).toUpperCase()}</span>
+              <span className="font-mono">{p.provider_txn_id ?? p.provider_order_id}</span>
+              {p.created_at && <span>{new Date(p.created_at).toLocaleString("en-IN")}</span>}
+              {p.is_simulated && <Badge variant="info">simulated</Badge>}
+            </li>
+          ))}
+        </ul>
+      )}
       {result && (
         <p className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
           {t("order.paymentStatus")} <StatusBadge status={result.status} />

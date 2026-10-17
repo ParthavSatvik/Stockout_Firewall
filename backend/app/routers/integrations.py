@@ -9,7 +9,7 @@ from xml.sax.saxutils import escape
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -17,12 +17,13 @@ from app.config import get_settings
 from app.database import get_db
 from app.deps import get_merchant_profile
 from app.models.core import MerchantProfile, SupplierProfile, User, UserRole
-from app.models.ops import Payment, PaymentProvider, PaymentStatus, ProviderEvent
+from app.models.ops import OutboundMessage, Payment, PaymentProvider, PaymentStatus, ProviderEvent
 from app.models.orders import AllocationStatus, Order, OrderItem, OrderStatus
 from app.providers import razorpay, sarvam, whatsapp
 from app.routers.orders import LOW_CONFIDENCE_THRESHOLD
 from app.security import get_current_user
 from app.services.notify import notify
+from app.services.order_intake import parse_with_assist
 from app.services.parsing import parse_order_text
 from app.services.planning import create_initial_plans, get_selected_plan, select_plan
 
@@ -86,7 +87,7 @@ async def transcribe_order(
     except httpx.HTTPError as exc:
         raise HTTPException(502, f"Sarvam transcription failed: {exc.__class__.__name__}") from exc
     return {"transcript": t.transcript, "language_code": t.language_code, "language_probability": t.language_probability,
-            "request_id": t.request_id, "source": "sarvam", "parse": _parse_result(t.transcript, db)}
+            "request_id": t.request_id, "source": "sarvam", "parse": parse_with_assist(t.transcript, db)}
 
 
 # ----------------------------------------------------------------- payments
@@ -245,6 +246,14 @@ async def whatsapp_inbound(request: Request, db: Session = Depends(get_db)) -> R
             db.commit()
             return _twiml("Sorry, that voice note could not be transcribed. Please type your order.")
 
+    reply = reply_to_order_message(db, merchant, text)
+    db.commit()
+    return _twiml(reply)
+
+
+def reply_to_order_message(db: Session, merchant: MerchantProfile, text: str) -> str:
+    """Shared by the Twilio webhook and the demo simulator: text -> order -> plans -> reply.
+    "YES" approves the cheapest feasible plan of the latest WhatsApp order."""
     if text.lower().strip(" .!") in CONFIRM_WORDS:
         since = datetime.now(UTC) - timedelta(hours=24)
         order = (db.query(Order).filter(Order.merchant_id == merchant.id, Order.status == OrderStatus.PLANNED,
@@ -252,37 +261,73 @@ async def whatsapp_inbound(request: Request, db: Session = Depends(get_db)) -> R
                  .order_by(Order.created_at.desc()).first())
         plan = min((p for p in order.plans if p.is_feasible and p.allocations), key=lambda p: p.total_cost, default=None) if order else None
         if plan is None:
-            db.commit()
-            return _twiml("There is no WhatsApp order waiting for confirmation. Send your order first, e.g. '100 kg akki'.")
+            return "There is no WhatsApp order waiting for confirmation. Send your order first, e.g. '100 kg akki'."
         select_plan(db, order, plan.id)
-        db.commit()
-        return _twiml(f"Confirmed order #{order.id[:8]}: Rs.{plan.total_cost:,.0f}. Suppliers have been asked to confirm; "
-                      "you will get updates here.")
+        return (f"Confirmed order #{order.id[:8]}: Rs.{plan.total_cost:,.0f}. Suppliers have been asked to confirm; "
+                "you will get updates here.")
 
-    parsed = parse_order_text(text, db)
-    if not parsed.items:
-        db.commit()
-        return _twiml("I could not find a product and quantity. Try: '100 kg akki' or '20 kg sugar, 10 litre oil'.")
-    order = Order(merchant_id=merchant.id, raw_input_text=f"[WhatsApp] {text}"[:2000], parse_confidence=parsed.overall_confidence,
-                  requires_confirmation=parsed.overall_confidence < LOW_CONFIDENCE_THRESHOLD or bool(parsed.unmatched_fragments),
+    parsed = parse_with_assist(text, db)
+    lines = [i for i in parsed["items"] if i["product_id"]]  # never create a line without a product
+    if not lines:
+        return "I could not find a product and quantity. Try: '100 kg akki' or '20 kg sugar, 10 litre oil'."
+    order = Order(merchant_id=merchant.id, raw_input_text=f"[WhatsApp] {text}"[:2000], parse_confidence=parsed["overall_confidence"],
+                  requires_confirmation=parsed["requires_confirmation"],
                   price_tolerance_pct=merchant.default_budget_tolerance_pct, min_reliability=merchant.default_min_reliability)
     db.add(order)
     db.flush()
-    for i in parsed.items:
-        db.add(OrderItem(order_id=order.id, product_id=i.product_id, requested_qty_base_unit=i.quantity_base_unit))
+    merged: dict[str, float] = {}
+    for i in lines:  # "10 kg akki and 5 kg rice" -> one line per product
+        merged[i["product_id"]] = merged.get(i["product_id"], 0.0) + i["quantity_base_unit"]
+    for pid, qty in merged.items():
+        db.add(OrderItem(order_id=order.id, product_id=pid, requested_qty_base_unit=qty))
     db.flush()
     db.refresh(order)
-    summary = ", ".join(f"{i.quantity_base_unit:g} {i.base_unit} {i.product_name}" for i in parsed.items)
+    summary = ", ".join(f"{i['quantity_base_unit']:g} {i['base_unit']} {i['product_name']}" for i in lines)
+    via = " (read with Sarvam AI)" if any(i["source"] == "sarvam_llm" for i in lines) else ""
     if order.requires_confirmation:
-        db.commit()
-        return _twiml(f"I read: {summary}, but I am not sure about part of it. Please review order #{order.id[:8]} in the app.")
+        return f"I read{via}: {summary}, but please check it. Review order #{order.id[:8]} in the app before it is planned."
     plans = create_initial_plans(db, order)
     best = min((p for p in plans if p.is_feasible and p.allocations), key=lambda p: p.total_cost, default=None)
-    db.commit()
     if best is None:
-        return _twiml(f"I read: {summary}. No supplier can fully cover this within your default rules; open order #{order.id[:8]} in the app.")
-    return _twiml(f"I read: {summary}. Best plan: Rs.{best.total_cost:,.0f} from {best.supplier_count} supplier(s), "
-                  f"about {best.estimated_delivery_hours:g}h. Reply YES to confirm.")
+        return f"I read: {summary}. No supplier can fully cover this within your default rules; open order #{order.id[:8]} in the app."
+    return (f"I read: {summary}. Best plan: Rs.{best.total_cost:,.0f} from {best.supplier_count} supplier(s), "
+            f"about {best.estimated_delivery_hours:g}h. Reply YES to confirm.")
+
+
+# ------------------------------------------------------- WhatsApp demo simulator
+
+class SimulatedMessage(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+
+
+@router.post("/api/whatsapp/simulate")
+def simulate_whatsapp(payload: SimulatedMessage, db: Session = Depends(get_db),
+                      merchant: MerchantProfile = Depends(get_merchant_profile)) -> dict:
+    """DEMO ONLY: send a message as if from WhatsApp. It runs the exact order logic of the
+    Twilio webhook, but nothing is sent over WhatsApp and no Twilio call is made."""
+    if not get_settings().demo_mode:
+        raise HTTPException(403, "The WhatsApp simulator is available only in demo mode")
+    import uuid as _uuid
+    _record_event(db, "whatsapp_sim", _uuid.uuid4().hex, "inbound_simulated", {"user_id": merchant.user_id, "text": payload.text})
+    reply = reply_to_order_message(db, merchant, payload.text.strip())
+    db.add(OutboundMessage(user_id=merchant.user_id, kind="chat_reply", to_address="(simulator)", body=reply, status="simulated",
+                           error="Simulator reply: not sent over WhatsApp"))
+    db.commit()
+    return {"reply": reply}
+
+
+@router.get("/api/whatsapp/thread")
+def whatsapp_thread(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> dict:
+    """Everything this user would receive on WhatsApp (and simulator messages they sent),
+    with the real delivery status of each message."""
+    out = [{"direction": "out", "kind": m.kind, "body": m.body, "status": m.status, "detail": m.error, "at": m.created_at}
+           for m in db.query(OutboundMessage).filter(OutboundMessage.user_id == user.id).order_by(OutboundMessage.created_at.desc()).limit(60)]
+    sent = [{"direction": "in", "kind": "simulated", "body": e.payload.get("text", ""), "status": "simulated", "detail": "", "at": e.created_at}
+            for e in db.query(ProviderEvent).filter(ProviderEvent.provider == "whatsapp_sim").order_by(ProviderEvent.created_at.desc()).limit(60)
+            if e.payload.get("user_id") == user.id]
+    s = get_settings()
+    return {"messages": sorted(out + sent, key=lambda m: m["at"])[-60:], "twilio_configured": s.twilio_configured,
+            "phone": user.phone_e164, "opted_in": user.whatsapp_opt_in, "simulator_available": s.demo_mode and user.role == UserRole.MERCHANT}
 
 
 # ------------------------------------------------------------------- routes

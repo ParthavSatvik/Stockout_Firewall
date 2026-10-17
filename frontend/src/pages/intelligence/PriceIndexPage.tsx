@@ -24,7 +24,8 @@ interface PriceIndexSummary {
 
 export function PriceIndexPage() {
   const { data: products } = useQuery({ queryKey: ["products"], queryFn: () => api.get<Product[]>("/api/products") });
-  const [productId, setProductId] = useState("");
+  const [chosen, setProductId] = useState("");
+  const productId = chosen || products?.[0]?.id || "";  // open on the first product instead of an empty page
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["price-index", productId],

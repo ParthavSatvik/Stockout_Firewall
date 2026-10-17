@@ -70,6 +70,9 @@ class SurplusListingRead(BaseModel):
     status: str
     lister_type: str  # "merchant" | "supplier"
     lister_name: str
+    is_mine: bool = False
+    pending_offer_count: int = 0
+    my_offer: "SurplusOfferRead | None" = None
 
     model_config = {"from_attributes": True}
 
@@ -86,5 +89,9 @@ class SurplusOfferRead(BaseModel):
     qty_requested_base_unit: float
     offered_price_per_base_unit: float
     status: str
+    offerer_name: str = ""
 
     model_config = {"from_attributes": True}
+
+
+SurplusListingRead.model_rebuild()

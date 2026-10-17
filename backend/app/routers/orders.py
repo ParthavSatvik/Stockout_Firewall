@@ -26,27 +26,10 @@ def parse_text(
     payload: ParseTextRequest, db: Session = Depends(get_db),
     _merchant: MerchantProfile = Depends(get_merchant_profile),
 ) -> dict:
-    """Deterministic lexicon-based extraction from free-text (including code-mixed
-    Kannada/Hindi/English). Never calls an LLM. Low confidence requires merchant
-    confirmation before the basket is planned."""
-    result = parse_order_text(payload.text, db)
-    return {
-        "items": [
-            {
-                "matched_text": i.matched_text,
-                "quantity_base_unit": i.quantity_base_unit,
-                "base_unit": i.base_unit,
-                "product_id": i.product_id,
-                "product_name": i.product_name,
-                "matched_alias": i.matched_alias,
-                "confidence": i.confidence,
-            }
-            for i in result.items
-        ],
-        "overall_confidence": result.overall_confidence,
-        "unmatched_fragments": result.unmatched_fragments,
-        "requires_confirmation": result.overall_confidence < LOW_CONFIDENCE_THRESHOLD or bool(result.unmatched_fragments),
-    }
+    """Deterministic lexicon extraction first; the Sarvam LLM assists only when that finds
+    nothing or is unsure, and its lines always require merchant confirmation."""
+    from app.services.order_intake import parse_with_assist
+    return parse_with_assist(payload.text, db)
 
 
 @router.post("", response_model=OrderRead, status_code=status.HTTP_201_CREATED)

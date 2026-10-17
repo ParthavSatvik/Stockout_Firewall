@@ -339,7 +339,7 @@ export function OrderDetailPage() {
               </div>
             )}
 
-            {(order.status === "confirmed" || order.status === "fulfilled") && <PayButton orderId={order.id} />}
+            {(order.status === "confirmed" || order.status === "fulfilled") && <PayButton orderId={order.id} amount={selectedPlan?.total_cost ?? 0} />}
           </div>
         )}
 
