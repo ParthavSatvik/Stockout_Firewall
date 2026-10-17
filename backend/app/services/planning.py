@@ -238,7 +238,10 @@ def select_plan(db: Session, order: Order, plan_id: str) -> AllocationPlan:
                     a.status = AllocationStatus.SUPERSEDED
     order.status = OrderStatus.AWAITING_CONFIRMATION
     db.flush()
-    return next(p for p in order.plans if p.id == plan_id)
+    selected = next(p for p in order.plans if p.id == plan_id)
+    from app.services.notify import announce_new_requests
+    announce_new_requests(db, selected)
+    return selected
 
 
 def get_selected_plan(order: Order) -> AllocationPlan | None:
@@ -455,6 +458,8 @@ def replan_after_event(
 
     order.status = OrderStatus.REPLANNING
     sync_order_status(db, order)
+    from app.services.notify import announce_replan
+    announce_replan(db, order, new_plan, reason)
     return new_plan
 
 

@@ -8,6 +8,7 @@ import { Input, Label, Select } from "../components/ui/input";
 import { ErrorState, Spinner } from "../components/ui/state";
 import { InfoHint } from "../components/ui/tooltip";
 import { useToast } from "../components/ui/toast";
+import { VoiceOrderButton } from "../components/VoiceOrderButton";
 import { ApiError, api } from "../lib/api";
 import type { ObjectiveProfile, Order, ParseResponse, Product } from "../lib/types";
 
@@ -23,7 +24,6 @@ interface DraftLine {
   requested_qty_base_unit: number;
   substitution_allowed: boolean;
 }
-
 export function NewOrderPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -97,7 +97,7 @@ export function NewOrderPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>1. Describe what you need (voice input falls back to text without Sarvam credentials)</CardTitle>
+          <CardTitle>1. Say or type what you need</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <textarea
@@ -107,6 +107,7 @@ export function NewOrderPage() {
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
+          <VoiceOrderButton onTranscript={(t) => setText(t)} />
           <div className="flex flex-wrap gap-2">
             {SAMPLE_TEXTS.map((s) => (
               <button

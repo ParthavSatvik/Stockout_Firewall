@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ApiError, api } from "../lib/api";
+import { ApiError, api, setSession } from "../lib/api";
+import { supabaseEnabled, supabaseSignIn } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import type { UserRole } from "../lib/types";
 import { Button } from "../components/ui/button";
@@ -19,7 +20,6 @@ const DEMO_ACCOUNTS: { label: string; email: string }[] = [
   { label: "Supplier — NewCo Supplies (new, low confidence)", email: "newco@example.com" },
   { label: "Admin — Control Tower", email: "admin@example.com" },
 ];
-
 export function LoginPage() {
   const [email, setEmail] = useState("merchant1@example.com");
   const [password, setPassword] = useState("demo1234");
@@ -33,11 +33,20 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const resp = await api.post<TokenResponse>("/api/auth/login", { email, password });
+      let resp: { access_token: string; role: TokenResponse["role"] };
+      if (supabaseEnabled) {
+        // Supabase verifies the password; our backend decides the role from its own records.
+        const accessToken = await supabaseSignIn(email, password);
+        setSession(accessToken, "");
+        const me = await api.get<{ role: TokenResponse["role"] }>("/api/auth/me");
+        resp = { access_token: accessToken, role: me.role };
+      } else {
+        resp = await api.post<TokenResponse>("/api/auth/login", { email, password });
+      }
       login(resp.access_token, resp.role);
       navigate(resp.role === "merchant" ? "/merchant" : resp.role === "supplier" ? "/supplier" : "/admin");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Login failed");
+      setError(err instanceof ApiError || err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoading(false);
     }

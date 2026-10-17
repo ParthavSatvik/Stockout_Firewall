@@ -33,8 +33,11 @@ def initiate_payment(
         raise HTTPException(status.HTTP_409_CONFLICT, "Order already has a successful payment")
 
     from app.config import get_settings
-    if not get_settings().demo_mode:
-        raise HTTPException(503, "Live and sandbox payments disabled pending provider signature verification")
+    settings = get_settings()
+    if settings.razorpay_configured:
+        raise HTTPException(409, "Razorpay is configured; pay through /api/payments/razorpay/order and Checkout")
+    if not settings.demo_mode:
+        raise HTTPException(503, "No verified payment provider is configured")
     provider = get_payment_provider()
     is_simulated = not hasattr(provider, "mid")
     idempotency_key = f"{order.id}:{uuid.uuid4().hex[:8]}"
@@ -86,8 +89,11 @@ async def paytm_callback(request: Request, db: Session = Depends(get_db)) -> dic
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown order")
 
     from app.config import get_settings
-    if not get_settings().demo_mode:
-        raise HTTPException(503, "Live and sandbox payments disabled pending provider signature verification")
+    settings = get_settings()
+    if settings.razorpay_configured:
+        raise HTTPException(409, "Razorpay is configured; pay through /api/payments/razorpay/order and Checkout")
+    if not settings.demo_mode:
+        raise HTTPException(503, "No verified payment provider is configured")
     provider = get_payment_provider()
     verified_status = provider.verify_status(payment.provider_order_id)
     payment.status = {

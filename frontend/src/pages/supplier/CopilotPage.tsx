@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { WhatsAppAlertsCard } from "../../components/WhatsAppAlertsCard";
 import { ArrowRight, CheckCircle2, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { MethodNote, PageHeader, Stat } from "../../components/supplier/parts";
@@ -129,6 +130,7 @@ export function CopilotPage() {
           </CardContent>
         </Card>
       )}
+      <WhatsAppAlertsCard audience="supplier" />
       <MethodNote>{q.data.method}</MethodNote>
     </div>
   );

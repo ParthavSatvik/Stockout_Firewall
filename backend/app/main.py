@@ -14,6 +14,7 @@ from app.routers import (
     auth,
     catalog,
     continuity,
+    integrations,
     intelligence,
     orders,
     payments,
@@ -47,11 +48,25 @@ app.include_router(catalog.router)
 app.include_router(suppliers.router)
 app.include_router(orders.router)
 app.include_router(allocations.router)
+# Before payments: its GET /api/payments/{payment_id} would otherwise capture /api/payments/config.
+app.include_router(integrations.router)
 app.include_router(payments.router)
 app.include_router(reconciliation.router)
 app.include_router(scenarios.router)
 app.include_router(admin.router)
 app.include_router(continuity.router)
+
+
+@app.middleware("http")
+async def send_queued_messages(request, call_next):
+    """WhatsApp messages queued by the request are sent after the response is returned."""
+    response = await call_next(request)
+    if request.method != "GET" and response.background is None:
+        from starlette.background import BackgroundTask
+
+        from app.services.notify import dispatch_queued
+        response.background = BackgroundTask(dispatch_queued)
+    return response
 app.include_router(intelligence.router)
 
 

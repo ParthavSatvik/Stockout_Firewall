@@ -25,8 +25,9 @@ from app.schemas.orders import (
 )
 from app.security import get_current_user
 from app.services import relay as relay_service
+from app.services.notify import merchant_user_id, notify
 from app.services.planning import replan_after_event, sync_order_status
-from app.services.promise import EPS, STAGES, assess_request, log, now_utc, position_for, reserve_stock, stage_of
+from app.services.promise import EPS, IST, STAGES, assess_request, log, now_utc, position_for, reserve_stock, stage_of
 from app.services.reliability import recompute_supplier_reliability
 
 router = APIRouter(prefix="/api/allocations", tags=["allocations"])
@@ -133,6 +134,9 @@ def confirm_allocation(
         replan_after_event(db, order, alloc, reason="short_supply")
     else:
         sync_order_status(db, order)
+    notify(db, merchant_user_id(db, order), "confirmation", "Supplier confirmed",
+           f"Order #{order.id[:8]}: {supplier.business_name} confirmed {payload.confirmed_qty_base_unit:g} {alloc.product.base_unit} "
+           f"{alloc.product.name}, ready by {payload.ready_by.astimezone(IST):%d %b %H:%M} IST.", order.id)
 
     recompute_supplier_reliability(db, supplier.id)
     db.commit()
@@ -230,6 +234,9 @@ def dispatch_allocation(
     alloc, order = _owned(db, allocation_id, supplier)
     if _advance_stage(db, alloc, order, supplier, user, "dispatched"):
         db.add(SupplierEvent(allocation_id=alloc.id, event_type=SupplierEventType.DISPATCHED, payload={}))
+        notify(db, merchant_user_id(db, order), "delivery", "Dispatched",
+               f"Order #{order.id[:8]}: {alloc.confirmed_qty_base_unit:g} {alloc.product.base_unit} {alloc.product.name} "
+               f"dispatched by {supplier.business_name}.", order.id)
     db.commit()
     return _read(db, alloc, supplier)
 
@@ -248,6 +255,9 @@ def deliver_allocation(
     _advance_stage(db, alloc, order, supplier, user, "delivered")
     alloc.status = AllocationStatus.FULFILLED
     db.add(SupplierEvent(allocation_id=alloc.id, event_type=SupplierEventType.DELIVERED, payload={}))
+    notify(db, merchant_user_id(db, order), "delivery", "Delivered",
+           f"Order #{order.id[:8]}: {supplier.business_name} marked {alloc.confirmed_qty_base_unit:g} {alloc.product.base_unit} "
+           f"{alloc.product.name} delivered. Record what you received to reconcile.", order.id)
     db.flush()
     sync_order_status(db, order)
     recompute_supplier_reliability(db, supplier.id)

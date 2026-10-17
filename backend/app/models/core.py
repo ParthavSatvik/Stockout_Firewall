@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import Enum, Float, ForeignKey, String
+from sqlalchemy import Enum, Float, ForeignKey, String, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -24,6 +24,9 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     supabase_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    # WhatsApp contact, E.164 (+919876543210). Messages are sent only with explicit opt-in.
+    phone_e164: Mapped[str | None] = mapped_column(String(20), nullable=True, unique=True, index=True)
+    whatsapp_opt_in: Mapped[bool] = mapped_column(default=False, server_default=false())
 
     merchant_profile: Mapped[MerchantProfile | None] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"

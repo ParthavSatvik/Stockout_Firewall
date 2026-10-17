@@ -22,7 +22,6 @@ from sqlalchemy.orm import Session
 from app.models.catalog import SupplierInventory
 from app.models.continuity import SupplyRelay, SupplyRelayInvite
 from app.models.core import MerchantProfile, SupplierProfile, User
-from app.models.ops import Notification
 from app.models.orders import (
     Allocation,
     AllocationPlan,
@@ -34,6 +33,7 @@ from app.models.orders import (
 )
 from app.services import optimizer
 from app.services.geo import estimate_distance_km, estimate_duration_minutes
+from app.services.notify import notify
 from app.services.planning import (
     _all_excluded_offer_ids,
     build_recovery_problem,
@@ -53,7 +53,7 @@ QUOTED = ("accepted", "modified")
 
 
 def _notify(db: Session, user_id: str, title: str, message: str, order_id: str | None = None) -> None:
-    db.add(Notification(user_id=user_id, type="supply_relay", title=title[:200], message=message[:500], related_order_id=order_id))
+    notify(db, user_id, "supply_relay", title, message, order_id)
 
 
 def candidates(db: Session, order: Order, product_id: str, origin_supplier_id: str, outstanding: float,

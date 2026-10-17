@@ -1,7 +1,9 @@
 """Authentication.
 
 Two verification paths:
-  1. Supabase-issued access tokens, verified against SUPABASE_JWT_SECRET (HS256) when configured.
+  1. Supabase-issued access tokens, verified against the project's JWKS (ES256/RS256 signing
+     keys) or, for legacy projects, SUPABASE_JWT_SECRET (HS256). Roles always come from our own
+     users table -- never from token metadata, which Supabase users can edit themselves.
   2. A local demo JWT (also HS256, LOCAL_JWT_SECRET) issued by our own /api/auth/login for
      local development without a Supabase project.
 
@@ -68,20 +70,31 @@ def _decode_local(token: str) -> dict | None:
         return None
 
 
+_jwks_client: jwt.PyJWKClient | None = None
+
+
+def _jwks() -> jwt.PyJWKClient:
+    global _jwks_client
+    if _jwks_client is None:
+        _jwks_client = jwt.PyJWKClient(settings.resolved_supabase_jwks_url, cache_keys=True, lifespan=600, timeout=5)
+    return _jwks_client
+
+
 def _decode_supabase(token: str) -> dict | None:
     if not settings.supabase_configured:
         return None
+    common = dict(audience="authenticated", issuer=settings.supabase_url.rstrip("/") + "/auth/v1",
+                  options={"require": ["exp", "sub", "iss", "aud"]})
     try:
-        return jwt.decode(
-            token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated",
-            issuer=settings.supabase_url.rstrip("/") + "/auth/v1",
-            options={"require": ["exp", "sub", "iss", "aud"]},
-        )
-    except jwt.PyJWTError:
+        alg = jwt.get_unverified_header(token).get("alg")
+        if alg in ("ES256", "RS256") and settings.resolved_supabase_jwks_url:
+            key = _jwks().get_signing_key_from_jwt(token).key
+            return jwt.decode(token, key, algorithms=["ES256", "RS256"], **common)
+        if alg == "HS256" and settings.supabase_jwt_secret:
+            return jwt.decode(token, settings.supabase_jwt_secret, algorithms=["HS256"], **common)
+    except (jwt.PyJWTError, jwt.PyJWKClientError):
         return None
+    return None
 
 
 def get_current_user(
@@ -103,6 +116,14 @@ def get_current_user(
             user = db.get(User, sub)
         else:
             user = db.query(User).filter(User.supabase_user_id == sub).first()
+            email = (claims.get("email") or "").lower()
+            if user is None and email and not claims.get("is_anonymous"):
+                # First Supabase sign-in of an existing account: link once, by email. This
+                # relies on Supabase "Confirm email" being enabled for the project.
+                user = db.query(User).filter(User.email == email, User.supabase_user_id.is_(None)).first()
+                if user is not None:
+                    user.supabase_user_id = sub
+                    db.commit()
 
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")

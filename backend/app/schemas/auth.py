@@ -29,5 +29,13 @@ class CurrentUserResponse(BaseModel):
     email: str
     full_name: str
     role: UserRole
+    phone_e164: str | None = None
+    whatsapp_opt_in: bool = False
 
     model_config = {"from_attributes": True}
+
+
+class ContactUpdateRequest(BaseModel):
+    # E.164: + then 8-15 digits, e.g. +919876543210
+    phone_e164: str | None = Field(default=None, pattern=r"^\+[1-9]\d{7,14}$")
+    whatsapp_opt_in: bool = False

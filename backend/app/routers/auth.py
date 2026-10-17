@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.core import MerchantProfile, SupplierProfile, User, UserRole
-from app.schemas.auth import CurrentUserResponse, LoginRequest, RegisterRequest, TokenResponse
+from app.schemas.auth import ContactUpdateRequest, CurrentUserResponse, LoginRequest, RegisterRequest, TokenResponse
 from app.security import create_local_access_token, get_current_user, hash_password, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -52,4 +52,20 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 
 @router.get("/me", response_model=CurrentUserResponse)
 def me(user: User = Depends(get_current_user)) -> User:
+    return user
+
+
+@router.put("/me/contact", response_model=CurrentUserResponse)
+def update_contact(payload: ContactUpdateRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> User:
+    """WhatsApp number and explicit opt-in. No message is ever sent without opt-in."""
+    if payload.phone_e164:
+        taken = db.query(User).filter(User.phone_e164 == payload.phone_e164, User.id != user.id).first()
+        if taken:
+            raise HTTPException(status.HTTP_409_CONFLICT, "This number is linked to another account")
+    if payload.whatsapp_opt_in and not payload.phone_e164:
+        raise HTTPException(422, "A WhatsApp number is required to opt in")
+    user.phone_e164 = payload.phone_e164
+    user.whatsapp_opt_in = payload.whatsapp_opt_in
+    db.commit()
+    db.refresh(user)
     return user

@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import JSON, Enum, Float, ForeignKey, Integer, String
+from sqlalchemy import JSON, Enum, Float, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -19,6 +19,7 @@ class PaymentStatus(str, enum.Enum):
 class PaymentProvider(str, enum.Enum):
     SIMULATED = "simulated"
     PAYTM = "paytm"
+    RAZORPAY = "razorpay"
 
 
 class Payment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -71,6 +72,35 @@ class ReceiptRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     product_id: Mapped[str] = mapped_column(ForeignKey("products.id"))
     received_qty_base_unit: Mapped[float] = mapped_column(Float)
     received_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+
+
+class ProviderEvent(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Every verified inbound provider event (Razorpay webhook, Twilio message), keyed by
+    the provider's own id so retries are processed exactly once."""
+
+    __tablename__ = "provider_events"
+    __table_args__ = (UniqueConstraint("provider", "external_id", name="uq_provider_event"),)
+
+    provider: Mapped[str] = mapped_column(String(20))
+    external_id: Mapped[str] = mapped_column(String(120))
+    event_type: Mapped[str] = mapped_column(String(60), default="")
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class OutboundMessage(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """WhatsApp (or other channel) message log. status: queued|sent|failed|skipped."""
+
+    __tablename__ = "outbound_messages"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    order_id: Mapped[str | None] = mapped_column(ForeignKey("orders.id"), nullable=True, index=True)
+    channel: Mapped[str] = mapped_column(String(20), default="whatsapp")
+    kind: Mapped[str] = mapped_column(String(40))
+    to_address: Mapped[str] = mapped_column(String(40), default="")
+    body: Mapped[str] = mapped_column(String(1600))
+    status: Mapped[str] = mapped_column(String(20), default="queued", index=True)
+    provider_sid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error: Mapped[str] = mapped_column(String(300), default="")
 
 
 class Notification(Base, UUIDPrimaryKeyMixin, TimestampMixin):

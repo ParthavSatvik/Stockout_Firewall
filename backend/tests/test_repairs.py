@@ -31,7 +31,7 @@ def planned(client, **kwargs):
 
 
 def supplier_header(client, allocation):
-    emails = {'Anand Wholesale Grains': 'anand@example.com', 'Lakshmi Traders': 'lakshmi@example.com', 'Sri Balaji Provisions': 'balaji@example.com'}
+    emails = {'Anand Wholesale Grains': 'anand@example.com', 'Lakshmi Traders': 'lakshmi@example.com', 'Sri Balaji Provisions': 'balaji@example.com', 'NewCo Supplies (joined this month)': 'newco@example.com'}
     return auth_headers(login(client, emails[allocation['supplier_name']]))
 
 

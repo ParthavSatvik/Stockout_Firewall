@@ -1,6 +1,10 @@
+import { lazy, Suspense } from "react";
+import { PayButton } from "../components/PayButton";
 import { RecoveryEvidence } from "../components/RecoveryEvidence";
 import { CommitmentTrail, RelayPanel } from "../components/RelayPanel";
 import type { RelayView } from "../lib/continuity";
+
+const RouteMap = lazy(() => import("../components/RouteMap"));
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
@@ -16,7 +20,7 @@ import { InfoHint } from "../components/ui/tooltip";
 import { useToast } from "../components/ui/toast";
 import { ApiError, api } from "../lib/api";
 import { formatINR, timeAgo } from "../lib/format";
-import type { AllocationPlan, Order, Payment, ReconciliationResponse, ScenarioResult } from "../lib/types";
+import type { AllocationPlan, Order, ReconciliationResponse, ScenarioResult } from "../lib/types";
 
 const OBJECTIVE_LABEL: Record<string, string> = {
   cheapest: "Cheapest",
@@ -159,17 +163,6 @@ export function OrderDetailPage() {
     },
   });
 
-  const payMutation = useMutation({
-    mutationFn: () => api.post<Payment>("/api/payments/initiate", { order_id: orderId }),
-    onSuccess: (payment) => {
-      qc.invalidateQueries({ queryKey: ["order", orderId] });
-      toast({
-        title: payment.status === "success" ? "Payment successful (simulated)" : "Payment failed (simulated)",
-        variant: payment.status === "success" ? "success" : "error",
-      });
-    },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "Payment failed"),
-  });
 
   const receiptMutation = useMutation({
     mutationFn: ({ allocationId, productId, qty }: { allocationId: string; productId: string; qty: number }) =>
@@ -230,6 +223,8 @@ export function OrderDetailPage() {
         <RecoveryEvidence orderId={order.id} />
 
         <RelayPanel orderId={order.id} relays={relays} />
+
+        {selectedPlan && <Suspense fallback={<p role="status" className="text-sm text-slate-500">Loading map…</p>}><RouteMap orderId={order.id} /></Suspense>}
 
         {isRecovering && (
           <div className="animate-recovery-pulse flex items-start gap-3 rounded-xl border border-signal-500/40 bg-signal-500/5 p-4">
@@ -341,17 +336,7 @@ export function OrderDetailPage() {
               </div>
             )}
 
-            {order.status === "confirmed" && (
-              <Button onClick={() => payMutation.mutate()} disabled={payMutation.isPending}>
-                {payMutation.isPending ? "Processing payment…" : "Pay now (simulated / Paytm sandbox)"}
-              </Button>
-            )}
-            {payMutation.data && (
-              <p className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                Payment status: <StatusBadge status={payMutation.data.status} />
-                {payMutation.data.is_simulated && <Badge variant="info">Simulated</Badge>}
-              </p>
-            )}
+            {(order.status === "confirmed" || order.status === "fulfilled") && <PayButton orderId={order.id} />}
           </div>
         )}
 

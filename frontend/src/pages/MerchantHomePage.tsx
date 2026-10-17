@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { WhatsAppAlertsCard } from "../components/WhatsAppAlertsCard";
 import { Link } from "react-router-dom";
 import {
   IndianRupee, TrendingUp, Clock, ShieldCheck, RotateCcw, AlertTriangle, AlertCircle,
@@ -195,6 +196,7 @@ export function MerchantHomePage() {
           })}
         </CardContent>
       </Card>
+      <WhatsAppAlertsCard audience="merchant" />
     </div>
   );
 }

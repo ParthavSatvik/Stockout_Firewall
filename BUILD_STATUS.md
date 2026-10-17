@@ -1,6 +1,49 @@
-> Historical source handoff. Superseded by root README.md, TEST_REPORT.md and REQUIREMENTS_MATRIX.md. In particular live payments are now disabled pending verification.
+> The 2026-10-17 sections below are current. Older sections further down are the historical handoff.
 
 # BUILD_STATUS
+
+## 2026-10-17 — Live integrations: what is verified, simulated or blocked
+
+**No credentials were available in this session.** The keys referred to as "supplied in a previous
+message" are not in this workspace, and pasted keys must be treated as compromised anyway: rotate
+them in the Supabase, Twilio and Sarvam dashboards, then put the replacements in `backend/.env` and
+`frontend/.env` (see `.env.example`). Nothing secret is hardcoded, and only public values
+(`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, the Razorpay key id) ever reach the browser.
+
+| Integration | What is built | Verified how | Live status |
+|---|---|---|---|
+| **OpenFreeMap map** | MapLibre GL 6.14 (patched; 5.x had a critical XSS advisory) + `liberty` style, lazy-loaded on the order page; supplier and merchant markers, road geometry | Rendered in the browser against the real tile service | **Live, tested** (no key needed) |
+| **OSRM road routing** | `GET /api/orders/{id}/routes`; real road distance, duration and geometry per supplier, cached; falls back to a dashed, labelled straight-line estimate | Real request: 14.44 km / 18.8 min Bengaluru route; shown on the map | **Live, tested** against the public OSRM demo server, which is for light non-commercial use: point `OSRM_BASE_URL` at your own or a hosted OSRM for production. Plan costs still use the labelled planner estimate. |
+| **Sarvam speech-to-text** | Browser recording (≤25 s) → `POST /api/orders/transcribe` → Sarvam `saaras:v4` → the same deterministic parser; WhatsApp voice notes use the same path | Request shape checked against docs.sarvam.ai; endpoint tested with Sarvam stubbed | **Blocked: needs `SARVAM_API_KEY`.** Without it the API returns 503 and the UI asks the merchant to type; no transcript is ever faked. |
+| **Supabase Auth** | ES256/RS256 access tokens verified against the project JWKS (legacy HS256 still supported); issuer, audience and expiry enforced; first sign-in links an existing account by email; **role always from our DB**, never from editable token metadata; frontend password sign-in and refresh over the Auth REST API | Unit-tested with a locally generated ES256 key (valid, expired, wrong issuer, unknown user, metadata role ignored) | **Blocked: needs `SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.** Turn on "Confirm email" (account linking relies on it) and create Supabase users for the demo emails. |
+| **Supabase PostgreSQL** | `DATABASE_URL` accepts the Supabase pooled connection string; migrations are additive and include the PostgreSQL enum change | Upgrade/downgrade/check on SQLite; PostgreSQL migration runs in CI | **Not run against Supabase.** Row Level Security policies are **not** implemented; all access goes through the API's own authorization. |
+| **Razorpay payments** | Server-created orders (amount in paise from the approved plan), Checkout.js, server-side signature verification against the *stored* order id, `X-Razorpay-Signature` webhooks with event-id idempotency, amount check, never downgrading a success, reuse of pending orders; live keys refused unless `PAYMENTS_LIVE_ENABLED=true`; the simulated path is disabled once Razorpay is configured | 3 tests with Razorpay stubbed: forged/mismatched signatures, duplicate and forged webhooks, amount mismatch, live-key gating | **Blocked: needs Razorpay test keys** (`rzp_test_…`) and a webhook secret. **No real or test payment has been made.** The simulated provider remains, labelled, when Razorpay is not configured. |
+| **Twilio WhatsApp** | Outbound via the Messages API (API key auth), queued in the business transaction and sent after the response; every message recorded as sent (with SID), failed (with error) or skipped (why); inbound `POST /api/whatsapp/inbound` with `X-Twilio-Signature` verification against `PUBLIC_BASE_URL`, MessageSid de-duplication, opt-in number lookup, text or voice-note orders → plans → "Reply YES" → plan approved and suppliers notified | 5 tests with Twilio stubbed: order → YES, forged signature, duplicate SID, unlinked number, failure alert after replan, failed send recorded as failed | **Blocked: needs Twilio credentials, a WhatsApp sender (sandbox or approved) and a public HTTPS URL** for the webhook (e.g. a tunnel to localhost). |
+
+**Workflow coverage.** Voice/text/WhatsApp order → optimizer plans → payment → supplier
+failure → automatic reallocation → updated cost and road route → WhatsApp alert. Each step uses
+the existing services. The failure alert is sent from `replan_after_event`, so every recovery path
+(reject, short supply, expiry, disruption, relay, Digital Twin) produces one.
+
+**Other fixes in this pass.** `GET /api/payments/{id}` was capturing `/api/payments/config`
+(fixed by router order). MapLibre's worker failed to load under Vite (fixed by bundling the
+worker explicitly).
+
+**Checks run:** backend `pytest` 75 passed (64 existing + 11 integration), `ruff` clean,
+`alembic check` clean; frontend 5 tests passed, `tsc` and lint clean (3 old fast-refresh
+warnings), production build OK, `npm audit` 0 vulnerabilities.
+
+### To go live (in order)
+1. Rotate every key that was pasted into chat; never commit `.env`.
+2. `backend/.env`: `SARVAM_API_KEY`, `SUPABASE_URL`, `SUPABASE_JWKS_URL` (optional), `RAZORPAY_KEY_ID/SECRET/WEBHOOK_SECRET` (test keys), `TWILIO_ACCOUNT_SID`, `TWILIO_API_KEY_SID/SECRET`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`, `PUBLIC_BASE_URL`; optionally `DATABASE_URL` for Supabase Postgres, then `alembic upgrade head`.
+3. `frontend/.env`: `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`.
+4. Twilio console: incoming WhatsApp webhook → `PUBLIC_BASE_URL/api/whatsapp/inbound` (POST). Razorpay dashboard: webhook → `/api/payments/razorpay/webhook` for `payment.captured`, `payment.failed`, `order.paid`.
+5. Re-test each row above against the real service and update this table. Only then set `APP_ENV=production` / `PAYMENTS_LIVE_ENABLED=true`.
+
+---
+
+
+# Historical handoff
 
 Last updated: 2026-10-16 (local Claude Code session, continuing from Cowork handoff)
 
