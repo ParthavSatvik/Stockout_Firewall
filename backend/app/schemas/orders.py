@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -57,6 +58,7 @@ class AllocationRead(BaseModel):
     route_duration_minutes: float | None
     route_source: str
     route_cost: float
+    fulfillment_stage: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -114,10 +116,42 @@ class SelectPlanRequest(BaseModel):
 class AllocationConfirmRequest(BaseModel):
     confirmed_qty_base_unit: float = Field(gt=0, le=1000000, allow_inf_nan=False)
     ready_by: datetime
+    # Dipping into safety stock is allowed only as an explicit, recorded decision.
+    override_safety_stock: bool = False
+    override_reason: str = Field(default="", max_length=300)
+
+
+RejectReasonCode = Literal["out_of_stock", "insufficient_capacity", "price_changed", "delivery_window", "quality_issue", "other"]
 
 
 class AllocationRejectRequest(BaseModel):
-    reason: str = ""
+    reason: str = Field(default="", max_length=300)
+    reason_code: RejectReasonCode = "other"
+
+
+class StageUpdateRequest(BaseModel):
+    stage: Literal["picking", "ready"]
+    note: str = Field(default="", max_length=300)
+
+
+class RelayOpenRequest(BaseModel):
+    """Commit what you can (0 allowed) and ask partner wholesalers for the rest."""
+    commit_qty_base_unit: float = Field(ge=0, le=1000000, allow_inf_nan=False)
+    ready_by: datetime | None = None
+    reason: str = Field(min_length=3, max_length=300)
+    response_window_minutes: int = Field(default=120, ge=15, le=720)
+
+
+class RelayRespondRequest(BaseModel):
+    action: Literal["accept", "modify", "decline"]
+    qty_base_unit: float | None = Field(default=None, gt=0, le=1000000, allow_inf_nan=False)
+    price_per_base_unit: float | None = Field(default=None, gt=0, le=1000000, allow_inf_nan=False)
+    ready_by: datetime | None = None
+    note: str = Field(default="", max_length=300)
+
+
+class RelayDecisionRequest(BaseModel):
+    note: str = Field(default="", max_length=300)
 
 
 class AllocationShortfallRequest(BaseModel):

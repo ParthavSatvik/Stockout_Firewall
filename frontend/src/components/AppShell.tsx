@@ -3,6 +3,7 @@ import { type ReactNode, useState } from "react";
 import {
   LayoutDashboard, ShoppingCart, PlusCircle, Radar, LifeBuoy, Wallet, TrendingDown,
   LineChart, Repeat, Recycle, Inbox, Boxes, ShieldCheck, Tv, LogOut, Moon, Sun, Menu,
+  Compass, Truck, Workflow, ScrollText, BadgeCheck,
 } from "lucide-react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
@@ -77,15 +78,22 @@ const MERCHANT_NAV: NavGroup[] = [
 
 const SUPPLIER_NAV: NavGroup[] = [
   {
-    label: "Operations",
+    label: "Commitments",
     items: [
-      { to: "/supplier", label: "Incoming Orders", icon: Inbox },
-      { to: "/supplier/inventory", label: "Inventory & Pricing", icon: Boxes },
+      { to: "/supplier", label: "Copilot", icon: Compass },
+      { to: "/supplier/requests", label: "Requests · PromiseGuard", icon: Inbox },
+      { to: "/supplier/dispatch", label: "Dispatch board", icon: Truck },
+      { to: "/supplier/relay", label: "Supply Relay", icon: Workflow },
     ],
   },
   {
-    label: "Intelligence",
-    items: [{ to: "/supplier/dead-stock", label: "Dead-Stock Exchange", icon: Recycle }],
+    label: "Stock & trust",
+    items: [
+      { to: "/supplier/ledger", label: "Promise Ledger", icon: ScrollText },
+      { to: "/supplier/passport", label: "Trust Passport", icon: BadgeCheck },
+      { to: "/supplier/inventory", label: "Inventory & Pricing", icon: Boxes },
+      { to: "/supplier/dead-stock", label: "Dead-Stock Exchange", icon: Recycle },
+    ],
   },
 ];
 

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -27,6 +29,10 @@ class SupplierInventoryRead(BaseModel):
     reliability_score: float
     reliability_confidence: str
     reliability_sample_size: int
+    safety_stock_base_unit: float = 0.0
+    committed_qty_base_unit: float = 0.0
+    free_to_promise_base_unit: float = 0.0
+    stock_confirmed_at: datetime | None = None
 
 
 class InventoryUpsertRequest(BaseModel):
@@ -35,9 +41,18 @@ class InventoryUpsertRequest(BaseModel):
     pack_size: float = Field(gt=0, le=1000000, allow_inf_nan=False)
     pack_unit: str
     price_per_base_unit: float = Field(gt=0, le=1000000, allow_inf_nan=False)
+    # Physical stock on hand. Live commitments are subtracted server-side so they are
+    # never promised twice.
     stock_qty_base_unit: float = Field(ge=0, le=1000000, allow_inf_nan=False)
     moq_base_unit: float = Field(default=0, ge=0, le=1000000, allow_inf_nan=False)
     is_available: bool = True
+    safety_stock_base_unit: float | None = Field(default=None, ge=0, le=1000000, allow_inf_nan=False)
+
+
+class StockCountRequest(BaseModel):
+    on_hand_base_unit: float = Field(ge=0, le=1000000, allow_inf_nan=False)
+    safety_stock_base_unit: float | None = Field(default=None, ge=0, le=1000000, allow_inf_nan=False)
+    reason: str = Field(default="", max_length=300)
 
 
 class SurplusListingCreate(BaseModel):

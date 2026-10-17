@@ -3,7 +3,7 @@ merchant order -> optimizer plan comparison -> supplier confirms partial quantit
 automatic failover re-optimizes the shortfall -> remaining suppliers confirm ->
 dispatch/deliver -> reconciliation.
 """
-from tests.conftest import auth_headers, login
+from tests.conftest import auth_headers, future, login
 
 
 def _rice_product_id(client):
@@ -80,7 +80,7 @@ def test_core_recovery_scenario_end_to_end(client):
     other_token = login(client, supplier_logins[other_name])
     forbidden_resp = client.post(
         f"/api/allocations/{first_alloc_id}/confirm",
-        json={"confirmed_qty_base_unit": 100, "ready_by": "2026-10-18T10:00:00Z"},
+        json={"confirmed_qty_base_unit": 100, "ready_by": future()},
         headers=auth_headers(other_token),
     )
     assert forbidden_resp.status_code == 404  # ownership-scoped, not leaked as 403
@@ -88,7 +88,7 @@ def test_core_recovery_scenario_end_to_end(client):
     # 4. THE CORE SCENARIO: primary supplier confirms only 40 of the 100kg.
     confirm_resp = client.post(
         f"/api/allocations/{first_alloc_id}/confirm",
-        json={"confirmed_qty_base_unit": 40, "ready_by": "2026-10-18T10:00:00Z"},
+        json={"confirmed_qty_base_unit": 40, "ready_by": future()},
         headers=auth_headers(first_supplier_token),
     )
     assert confirm_resp.status_code == 200, confirm_resp.text
@@ -122,7 +122,7 @@ def test_core_recovery_scenario_end_to_end(client):
         supplier_token = login(client, supplier_logins[line["supplier_name"]])
         r = client.post(
             f"/api/allocations/{line['id']}/confirm",
-            json={"confirmed_qty_base_unit": line["allocated_qty_base_unit"], "ready_by": "2026-10-18T10:00:00Z"},
+            json={"confirmed_qty_base_unit": line["allocated_qty_base_unit"], "ready_by": future()},
             headers=auth_headers(supplier_token),
         )
         assert r.status_code == 200, r.text
@@ -233,7 +233,7 @@ def test_reconciliation_flags_missing_goods_and_price_discrepancy(client):
     supplier_token = login(client, supplier_logins[alloc["supplier_name"]])
     client.post(
         f"/api/allocations/{alloc['id']}/confirm",
-        json={"confirmed_qty_base_unit": alloc["allocated_qty_base_unit"], "ready_by": "2026-10-18T10:00:00Z"},
+        json={"confirmed_qty_base_unit": alloc["allocated_qty_base_unit"], "ready_by": future()},
         headers=auth_headers(supplier_token),
     )
 

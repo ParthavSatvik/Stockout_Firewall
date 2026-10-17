@@ -7,6 +7,7 @@ from app.models.catalog import (
     SurplusListing,
     SurplusOffer,
 )
+from app.models.continuity import CommitmentLedgerEntry, SupplyRelay, SupplyRelayInvite
 from app.models.core import MerchantProfile, SupplierProfile, User, UserRole
 from app.models.ops import (
     AuditEvent,
@@ -63,4 +64,7 @@ __all__ = [
     "AuditEvent",
     "SupplierReliabilityStat",
     "ScenarioSimulation",
+    "SupplyRelay",
+    "SupplyRelayInvite",
+    "CommitmentLedgerEntry",
 ]

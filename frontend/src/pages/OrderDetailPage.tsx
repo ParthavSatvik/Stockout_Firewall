@@ -1,4 +1,6 @@
 import { RecoveryEvidence } from "../components/RecoveryEvidence";
+import { CommitmentTrail, RelayPanel } from "../components/RelayPanel";
+import type { RelayView } from "../lib/continuity";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
@@ -92,7 +94,7 @@ function OrderTimeline({ order }: { order: Order }) {
   }
   for (const r of replans) {
     events.push({
-      icon: RotateCcw, label: `Automatic replan: ${r.replan_reason.replace(/_/g, " ")}`,
+      icon: RotateCcw, label: r.replan_reason === "supply_relay" ? "Supply relay plan approved" : `Automatic replan: ${r.replan_reason.replace(/_/g, " ")}`,
       detail: `New total cost ${formatINR(r.total_cost)}`, time: r.created_at, tone: "text-signal-600",
     });
   }
@@ -193,6 +195,13 @@ export function OrderDetailPage() {
     },
   });
 
+  const relaysQuery = useQuery({
+    queryKey: ["order-relays", orderId],
+    queryFn: () => api.get<RelayView[]>(`/api/orders/${orderId}/relays`),
+    enabled: !!orderId,
+    refetchInterval: 5000,
+  });
+
   const reconciliationQuery = useQuery({
     queryKey: ["reconciliation", orderId],
     queryFn: () => api.get<ReconciliationResponse>(`/api/orders/${orderId}/reconciliation`),
@@ -206,7 +215,9 @@ export function OrderDetailPage() {
   const plans = order.plans;
   const selectedPlan = plans.find((p) => p.is_selected);
   const latestPlans = plans.slice(-3);
-  const isRecovering = order.status === "replanning";
+  const relays = relaysQuery.data ?? [];
+  const relayOpen = relays.some((r) => r.status === "open");
+  const isRecovering = order.status === "replanning" && !relayOpen;
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -217,6 +228,8 @@ export function OrderDetailPage() {
         </div>
 
         <RecoveryEvidence orderId={order.id} />
+
+        <RelayPanel orderId={order.id} relays={relays} />
 
         {isRecovering && (
           <div className="animate-recovery-pulse flex items-start gap-3 rounded-xl border border-signal-500/40 bg-signal-500/5 p-4">
@@ -406,6 +419,8 @@ export function OrderDetailPage() {
             <OrderTimeline order={order} />
           </CardContent>
         </Card>
+
+        <CommitmentTrail orderId={order.id} />
 
         {selectedPlan && (
           <Card>

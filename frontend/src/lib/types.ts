@@ -31,6 +31,10 @@ export interface SupplierOffer {
   reliability_score: number;
   reliability_confidence: "low" | "medium" | "high";
   reliability_sample_size: number;
+  safety_stock_base_unit: number;
+  committed_qty_base_unit: number;
+  free_to_promise_base_unit: number;
+  stock_confirmed_at: string | null;
 }
 
 export interface SurplusListing {
@@ -92,6 +96,7 @@ export interface Allocation {
   route_duration_minutes: number | null;
   route_source: string;
   route_cost: number;
+  fulfillment_stage?: string | null;
 }
 
 export interface AllocationPlan {

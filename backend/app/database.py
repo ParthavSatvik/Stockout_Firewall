@@ -28,7 +28,8 @@ def get_db(request: Request) -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         # GET order reads can expire commitments and therefore also require a lock.
-        writes = request.method != "GET" or request.url.path.startswith("/api/orders")
+        # Relay listings may close an expired relay, which also replans.
+        writes = request.method != "GET" or request.url.path.startswith(("/api/orders", "/api/relays"))
         if writes:
             if engine.dialect.name == "sqlite":
                 db.execute(text("BEGIN IMMEDIATE"))

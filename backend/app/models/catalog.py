@@ -54,6 +54,11 @@ class SupplierInventory(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     moq_base_unit: Mapped[float] = mapped_column(Float, default=0.0)
     is_available: Mapped[bool] = mapped_column(Boolean, default=True)
     freshness_source: Mapped[str] = mapped_column(String(30), default="manual")  # manual|synced|stale
+    # PromiseGuard. stock_qty_base_unit stays the *uncommitted* quantity (confirmations
+    # deduct from it atomically); safety stock is held back from new promises on top.
+    safety_stock_base_unit: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    stock_confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    reported_on_hand_base_unit: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     supplier: Mapped[SupplierProfile] = relationship()
     product: Mapped[Product] = relationship()

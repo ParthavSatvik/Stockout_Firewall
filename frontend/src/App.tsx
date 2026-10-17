@@ -10,7 +10,13 @@ const MerchantHomePage = lazy(() => import("./pages/MerchantHomePage").then(m =>
 const MerchantOrdersPage = lazy(() => import("./pages/MerchantOrdersPage").then(m => ({ default: m.MerchantOrdersPage })));
 const NewOrderPage = lazy(() => import("./pages/NewOrderPage").then(m => ({ default: m.NewOrderPage })));
 const OrderDetailPage = lazy(() => import("./pages/OrderDetailPage").then(m => ({ default: m.OrderDetailPage })));
-const SupplierDashboard = lazy(() => import("./pages/SupplierDashboard").then(m => ({ default: m.SupplierDashboard })));
+const CopilotPage = lazy(() => import("./pages/supplier/CopilotPage").then(m => ({ default: m.CopilotPage })));
+const RequestsPage = lazy(() => import("./pages/supplier/RequestsPage").then(m => ({ default: m.RequestsPage })));
+const DispatchPage = lazy(() => import("./pages/supplier/DispatchPage").then(m => ({ default: m.DispatchPage })));
+const RelayPage = lazy(() => import("./pages/supplier/RelayPage").then(m => ({ default: m.RelayPage })));
+const LedgerPage = lazy(() => import("./pages/supplier/LedgerPage").then(m => ({ default: m.LedgerPage })));
+const PassportPage = lazy(() => import("./pages/supplier/PassportPage").then(m => ({ default: m.PassportPage })));
+const NetworkPassportPage = lazy(() => import("./pages/supplier/NetworkPassportPage").then(m => ({ default: m.NetworkPassportPage })));
 const SupplierInventoryPage = lazy(() => import("./pages/SupplierInventoryPage").then(m => ({ default: m.SupplierInventoryPage })));
 const AutopilotPage = lazy(() => import("./pages/intelligence/AutopilotPage").then(m => ({ default: m.AutopilotPage })));
 const CashCyclePage = lazy(() => import("./pages/intelligence/CashCyclePage").then(m => ({ default: m.CashCyclePage })));
@@ -56,7 +62,14 @@ export default function App() {
                 <Route path="/merchant/intelligence/autopilot" element={<Protected role="merchant"><AutopilotPage /></Protected>} />
                 <Route path="/merchant/intelligence/dead-stock" element={<Protected role="merchant"><DeadStockExchangePage /></Protected>} />
 
-                <Route path="/supplier" element={<Protected role="supplier"><SupplierDashboard /></Protected>} />
+                <Route path="/merchant/suppliers/:supplierId/passport" element={<Protected role="merchant"><NetworkPassportPage /></Protected>} />
+
+                <Route path="/supplier" element={<Protected role="supplier"><CopilotPage /></Protected>} />
+                <Route path="/supplier/requests" element={<Protected role="supplier"><RequestsPage /></Protected>} />
+                <Route path="/supplier/dispatch" element={<Protected role="supplier"><DispatchPage /></Protected>} />
+                <Route path="/supplier/relay" element={<Protected role="supplier"><RelayPage /></Protected>} />
+                <Route path="/supplier/ledger" element={<Protected role="supplier"><LedgerPage /></Protected>} />
+                <Route path="/supplier/passport" element={<Protected role="supplier"><PassportPage /></Protected>} />
                 <Route path="/supplier/inventory" element={<Protected role="supplier"><SupplierInventoryPage /></Protected>} />
                 <Route path="/supplier/dead-stock" element={<Protected role="supplier"><DeadStockExchangePage /></Protected>} />
 

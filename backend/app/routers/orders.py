@@ -9,6 +9,7 @@ from app.models.orders import Order, OrderItem, OrderStatus
 from app.schemas.orders import OrderCreate, OrderRead, PlanComparisonResponse, SelectPlanRequest
 from app.services.parsing import parse_order_text
 from app.services.planning import create_initial_plans, expire_overdue_allocations, select_plan
+from app.services.relay import expire_due_relays
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
@@ -151,6 +152,7 @@ def list_orders(
     db: Session = Depends(get_db), merchant: MerchantProfile = Depends(get_merchant_profile)
 ) -> list[Order]:
     orders = db.query(Order).filter(Order.merchant_id == merchant.id).order_by(Order.created_at.desc()).all()
+    expire_due_relays(db)
     for o in orders:
         expire_overdue_allocations(db, o)
     db.commit()
@@ -164,6 +166,7 @@ def get_order(
     order = db.get(Order, order_id)
     if order is None or order.merchant_id != merchant.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
+    expire_due_relays(db, order.id)
     expire_overdue_allocations(db, order)
     db.commit()
     db.refresh(order)

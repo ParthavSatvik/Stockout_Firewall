@@ -39,3 +39,9 @@ def login(client: TestClient, email: str, password: str = "demo1234") -> str:
 
 def auth_headers(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
+
+
+def future(hours: float = 24) -> str:
+    """A ready-by time that is always in the future (ready-by must not be in the past)."""
+    from datetime import UTC, datetime, timedelta
+    return (datetime.now(UTC) + timedelta(hours=hours)).isoformat()

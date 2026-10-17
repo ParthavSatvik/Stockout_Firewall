@@ -4,10 +4,12 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_supplier_profile
 from app.models.catalog import PriceObservation, Product, SupplierInventory
-from app.models.core import SupplierProfile
+from app.models.core import SupplierProfile, User
 from app.models.orders import Allocation, AllocationPlan, OrderItem
-from app.schemas.catalog import InventoryUpsertRequest, SupplierInventoryRead
+from app.schemas.catalog import InventoryUpsertRequest, StockCountRequest, SupplierInventoryRead
 from app.schemas.orders import AllocationRead
+from app.security import get_current_user
+from app.services.promise import position_for, positions, record_stock_count
 from app.services.reliability import get_or_default_reliability, recompute_supplier_reliability
 
 router = APIRouter(prefix="/api/suppliers/me", tags=["suppliers"])
@@ -17,28 +19,29 @@ router = APIRouter(prefix="/api/suppliers/me", tags=["suppliers"])
 def my_inventory(
     db: Session = Depends(get_db), supplier: SupplierProfile = Depends(get_supplier_profile)
 ) -> list[SupplierInventoryRead]:
-    rows = db.query(SupplierInventory, Product).join(Product, SupplierInventory.product_id == Product.id).filter(
-        SupplierInventory.supplier_id == supplier.id
-    ).all()
     stat = get_or_default_reliability(db, supplier.id)
-    return [
-        SupplierInventoryRead(
-            id=inv.id, supplier_id=supplier.id, supplier_name=supplier.business_name,
-            product_id=p.id, product_name=p.name, brand=inv.brand, pack_size=inv.pack_size,
-            pack_unit=inv.pack_unit, price_per_base_unit=inv.price_per_base_unit,
-            stock_qty_base_unit=inv.stock_qty_base_unit, moq_base_unit=inv.moq_base_unit,
-            is_available=inv.is_available, freshness_source=inv.freshness_source,
-            reliability_score=stat.reliability_score, reliability_confidence=stat.confidence,
-            reliability_sample_size=stat.sample_size,
-        )
-        for inv, p in rows
-    ]
+    return [_inventory_read(pos, supplier, stat) for pos in positions(db, supplier.id)]
+
+
+def _inventory_read(pos, supplier: SupplierProfile, stat) -> SupplierInventoryRead:
+    inv, p = pos.inventory, pos.product
+    return SupplierInventoryRead(
+        id=inv.id, supplier_id=supplier.id, supplier_name=supplier.business_name,
+        product_id=p.id, product_name=p.name, brand=inv.brand, pack_size=inv.pack_size,
+        pack_unit=inv.pack_unit, price_per_base_unit=inv.price_per_base_unit,
+        stock_qty_base_unit=round(pos.on_hand, 3), moq_base_unit=inv.moq_base_unit,
+        is_available=inv.is_available, freshness_source=inv.freshness_source,
+        reliability_score=stat.reliability_score, reliability_confidence=stat.confidence,
+        reliability_sample_size=stat.sample_size, safety_stock_base_unit=pos.safety_stock,
+        committed_qty_base_unit=round(pos.committed, 3), free_to_promise_base_unit=round(pos.free_to_promise, 3),
+        stock_confirmed_at=inv.stock_confirmed_at,
+    )
 
 
 @router.post("/inventory", response_model=SupplierInventoryRead, status_code=status.HTTP_201_CREATED)
 def upsert_inventory(
     payload: InventoryUpsertRequest, db: Session = Depends(get_db),
-    supplier: SupplierProfile = Depends(get_supplier_profile),
+    supplier: SupplierProfile = Depends(get_supplier_profile), user: User = Depends(get_current_user),
 ) -> SupplierInventoryRead:
     product = db.get(Product, payload.product_id)
     if product is None:
@@ -54,31 +57,41 @@ def upsert_inventory(
         .first()
     )
     if inv is None:
-        inv = SupplierInventory(supplier_id=supplier.id, product_id=payload.product_id)
+        inv = SupplierInventory(supplier_id=supplier.id, product_id=payload.product_id, stock_qty_base_unit=0.0)
         db.add(inv)
+        db.flush()
+        db.refresh(inv)
 
     inv.brand = payload.brand
     inv.pack_size = payload.pack_size
     inv.pack_unit = payload.pack_unit
     inv.price_per_base_unit = payload.price_per_base_unit
-    inv.stock_qty_base_unit = payload.stock_qty_base_unit
     inv.moq_base_unit = payload.moq_base_unit
     inv.is_available = payload.is_available
-    inv.freshness_source = "manual"
+    # The submitted stock is a physical count; live commitments are subtracted so the
+    # same units are never promised twice.
+    record_stock_count(db, supplier, inv, payload.stock_qty_base_unit, user.id,
+                       safety_stock=payload.safety_stock_base_unit, reason="listing saved")
     db.add(PriceObservation(supplier_id=supplier.id, product_id=payload.product_id, price_per_base_unit=payload.price_per_base_unit))
     db.commit()
     db.refresh(inv)
+    return _inventory_read(position_for(db, inv), supplier, get_or_default_reliability(db, supplier.id))
 
-    stat = get_or_default_reliability(db, supplier.id)
-    return SupplierInventoryRead(
-        id=inv.id, supplier_id=supplier.id, supplier_name=supplier.business_name,
-        product_id=product.id, product_name=product.name, brand=inv.brand, pack_size=inv.pack_size,
-        pack_unit=inv.pack_unit, price_per_base_unit=inv.price_per_base_unit,
-        stock_qty_base_unit=inv.stock_qty_base_unit, moq_base_unit=inv.moq_base_unit,
-        is_available=inv.is_available, freshness_source=inv.freshness_source,
-        reliability_score=stat.reliability_score, reliability_confidence=stat.confidence,
-        reliability_sample_size=stat.sample_size,
-    )
+
+@router.post("/inventory/{inventory_id}/stock-count", response_model=SupplierInventoryRead)
+def stock_count(
+    inventory_id: str, payload: StockCountRequest, db: Session = Depends(get_db),
+    supplier: SupplierProfile = Depends(get_supplier_profile), user: User = Depends(get_current_user),
+) -> SupplierInventoryRead:
+    """Record a physical count. A count below live commitments is flagged as drift."""
+    inv = db.get(SupplierInventory, inventory_id)
+    if inv is None or inv.supplier_id != supplier.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Inventory not found")
+    record_stock_count(db, supplier, inv, payload.on_hand_base_unit, user.id,
+                       safety_stock=payload.safety_stock_base_unit, reason=payload.reason)
+    db.commit()
+    db.refresh(inv)
+    return _inventory_read(position_for(db, inv), supplier, get_or_default_reliability(db, supplier.id))
 
 
 @router.get("/allocations", response_model=list[AllocationRead])
@@ -107,7 +120,7 @@ def incoming_allocations(
             pack_count=a.pack_count, status=a.status, confirmed_qty_base_unit=a.confirmed_qty_base_unit,
             confirmed_ready_by=a.confirmed_ready_by, confirmation_expires_at=a.confirmation_expires_at,
             route_distance_km=a.route_distance_km, route_duration_minutes=a.route_duration_minutes,
-            route_source=a.route_source, route_cost=a.route_cost,
+            route_source=a.route_source, route_cost=a.route_cost, fulfillment_stage=a.fulfillment_stage,
         )
         for a, oi, p in rows
     ]

@@ -7,7 +7,7 @@ from app.database import SessionLocal
 from app.models.catalog import SupplierInventory
 from app.models.orders import Allocation
 from app.services.optimizer import ItemRequest, OptimizerPolicy, solve_allocation
-from tests.conftest import auth_headers, login
+from tests.conftest import auth_headers, future, login
 from tests.test_api_workflow import _rice_product_id
 from tests.test_optimizer import make_offer
 
@@ -81,7 +81,7 @@ def test_repeated_lines_cannot_double_spend_stock():
 def test_recovery_respects_total_budget_and_supplier_limit(client):
     order, h, p = planned(client, budget_cap=4000, max_suppliers=1)
     a = p['allocations'][0]
-    r = client.post(f"/api/allocations/{a['id']}/confirm", json={'confirmed_qty_base_unit': 40, 'ready_by': '2026-11-01T10:00:00Z'}, headers=supplier_header(client, a))
+    r = client.post(f"/api/allocations/{a['id']}/confirm", json={'confirmed_qty_base_unit': 40, 'ready_by': future()}, headers=supplier_header(client, a))
     assert r.status_code == 200, r.text
     evidence = client.get(f"/api/orders/{order['id']}/evidence", headers=h).json()
     assert evidence['budget_respected'] and evidence['supplier_limit_respected']
@@ -106,7 +106,7 @@ def test_confirmation_retry_and_stock_race(client):
         inv.stock_qty_base_unit = quantity
         db.commit()
     def confirm(a):
-        return client.post(f"/api/allocations/{a['id']}/confirm", headers=sh, json={'confirmed_qty_base_unit': quantity, 'ready_by': '2026-11-01T10:00:00Z'})
+        return client.post(f"/api/allocations/{a['id']}/confirm", headers=sh, json={'confirmed_qty_base_unit': quantity, 'ready_by': future()})
     try:
         with ThreadPoolExecutor(max_workers=2) as pool:
             results = list(pool.map(confirm, [a1, a2]))
@@ -126,8 +126,8 @@ def test_superseded_delivery_and_overconfirmation_rejected(client):
     a = p['allocations'][0]
     sh = supplier_header(client, a)
     path = f"/api/allocations/{a['id']}"
-    assert client.post(path+'/confirm', headers=sh, json={'confirmed_qty_base_unit': 101, 'ready_by': '2026-11-01T10:00:00Z'}).status_code == 422
-    assert client.post(path+'/confirm', headers=sh, json={'confirmed_qty_base_unit': 40, 'ready_by': '2026-11-01T10:00:00Z'}).status_code == 200
+    assert client.post(path+'/confirm', headers=sh, json={'confirmed_qty_base_unit': 101, 'ready_by': future()}).status_code == 422
+    assert client.post(path+'/confirm', headers=sh, json={'confirmed_qty_base_unit': 40, 'ready_by': future()}).status_code == 200
     assert client.post(path+'/deliver', headers=sh).status_code == 409
     assert client.post(f"/api/orders/{order['id']}/plan", headers=h).status_code == 409
 
@@ -169,7 +169,7 @@ def test_confirmed_is_not_delivered_and_reliability_does_not_double_count(client
     with SessionLocal() as db:
         before = recompute_supplier_reliability(db, a['supplier_id']).sample_size
         db.commit()
-    r = client.post(f"/api/allocations/{a['id']}/confirm", headers=supplier_header(client, a), json={'confirmed_qty_base_unit': a['allocated_qty_base_unit'], 'ready_by': '2026-11-01T10:00:00Z'})
+    r = client.post(f"/api/allocations/{a['id']}/confirm", headers=supplier_header(client, a), json={'confirmed_qty_base_unit': a['allocated_qty_base_unit'], 'ready_by': future()})
     assert r.status_code == 200
     with SessionLocal() as db:
         after = recompute_supplier_reliability(db, a['supplier_id']).sample_size
@@ -186,7 +186,7 @@ def test_stock_failure_rolls_back_confirmation(client):
         inv.stock_qty_base_unit = 0
         db.commit()
     try:
-        r = client.post(f"/api/allocations/{a['id']}/confirm", headers=supplier_header(client, a), json={'confirmed_qty_base_unit': a['allocated_qty_base_unit'], 'ready_by': '2026-11-01T10:00:00Z'})
+        r = client.post(f"/api/allocations/{a['id']}/confirm", headers=supplier_header(client, a), json={'confirmed_qty_base_unit': a['allocated_qty_base_unit'], 'ready_by': future()})
         assert r.status_code == 409
         with SessionLocal() as db:
             assert db.get(Allocation, a['id']).status.value == 'proposed'

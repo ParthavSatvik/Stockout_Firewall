@@ -148,6 +148,8 @@ class Allocation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     route_duration_minutes: Mapped[float | None] = mapped_column(Float, nullable=True)
     route_source: Mapped[str] = mapped_column(String(20), default="estimated")  # estimated|google_routes
     route_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    # Operational stage after acceptance: reserved|picking|ready|dispatched|delivered.
+    fulfillment_stage: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     plan: Mapped[AllocationPlan] = relationship(back_populates="allocations")
     order_item: Mapped[OrderItem] = relationship()

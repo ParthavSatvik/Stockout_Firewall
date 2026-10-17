@@ -53,7 +53,9 @@ def gather_offers(
     )
     offers = []
     for inv, supplier in rows:
-        updated = inv.updated_at.replace(tzinfo=UTC) if inv.updated_at.tzinfo is None else inv.updated_at
+        # A physical stock count is the freshness evidence; listing edits are the legacy fallback.
+        updated = inv.stock_confirmed_at or inv.updated_at
+        updated = updated.replace(tzinfo=UTC) if updated.tzinfo is None else updated
         if inv.freshness_source == "stale" or datetime.now(UTC) - updated > timedelta(hours=24):
             continue
         if inv.pack_unit != inv.product.base_unit:
@@ -70,7 +72,8 @@ def gather_offers(
                 product_id=product_id,
                 pack_size_base_unit=inv.pack_size,
                 price_per_base_unit=inv.price_per_base_unit,
-                stock_qty_base_unit=inv.stock_qty_base_unit,
+                # Safety stock is never offered to merchants.
+                stock_qty_base_unit=max(0.0, inv.stock_qty_base_unit - (inv.safety_stock_base_unit or 0.0)),
                 moq_base_unit=inv.moq_base_unit,
                 reliability_score=stat.reliability_score,
                 reliability_confidence=stat.confidence,
@@ -203,6 +206,27 @@ def create_initial_plans(db: Session, order: Order) -> list[AllocationPlan]:
     return plans
 
 
+def outstanding_by_item(order: Order, plan: AllocationPlan, exclude_allocation_id: str | None = None) -> dict[str, float]:
+    """Requested minus everything secured or still pending on `plan`, per order item."""
+    out: dict[str, float] = {}
+    for item in order.items:
+        secured = 0.0
+        for a in plan.allocations:
+            if a.order_item_id != item.id:
+                continue
+            if a.status in (AllocationStatus.CONFIRMED, AllocationStatus.FULFILLED, AllocationStatus.SHORT_SUPPLY):
+                secured += _effective_qty(a)
+            elif a.status == AllocationStatus.PROPOSED and a.id != exclude_allocation_id:
+                secured += a.allocated_qty_base_unit  # still pending, assume it will land
+        out[item.id] = max(0.0, round(item.requested_qty_base_unit - secured, 3))
+    return out
+
+
+def open_relays(db: Session, order: Order) -> list:
+    from app.models.continuity import SupplyRelay
+    return db.query(SupplyRelay).filter(SupplyRelay.order_id == order.id, SupplyRelay.status == "open").all()
+
+
 def select_plan(db: Session, order: Order, plan_id: str) -> AllocationPlan:
     for plan in order.plans:
         if plan.id == plan_id:
@@ -232,6 +256,11 @@ def sync_order_status(db: Session, order: Order) -> None:
     """
     plan = get_selected_plan(order)
     if plan is None:
+        return
+    if open_relays(db, order):
+        # A supplier relay is collecting partner responses for an uncovered quantity.
+        order.status = OrderStatus.REPLANNING
+        db.flush()
         return
     active = [a for a in plan.allocations if a.status not in EXCLUDED_TERMINAL_STATUSES and _effective_qty(a) > 0]
     if not active:
@@ -271,31 +300,97 @@ def _all_excluded_offer_ids(db: Session, order: Order) -> set[str]:
     return excluded
 
 
-def replan_after_event(
-    db: Session, order: Order, trigger_allocation: Allocation, reason: str
-) -> AllocationPlan:
+def build_recovery_problem(
+    db: Session, order: Order, plan: AllocationPlan, outstanding: dict[str, float],
+    excluded_offer_ids: set[str], offers_override: dict[str, list[optimizer.OfferCandidate]] | None = None,
+) -> tuple[list, dict, dict, optimizer.OptimizerPolicy] | None:
+    """Optimizer inputs for covering `outstanding` on top of what `plan` already holds:
+    remaining budget, original price ceiling, supplier limit and remaining capacity.
+    Shared by the real replan and the read-only Supply Relay preview so both apply
+    exactly the same merchant policy."""
     from app.models.core import MerchantProfile
+
+    merchant = db.get(MerchantProfile, order.merchant_id)
+    preferred = set(order.preferred_supplier_ids or [])
+    items = []
+    offers_by_product: dict[str, list[optimizer.OfferCandidate]] = {}
+    for item in order.items:
+        item_outstanding = outstanding.get(item.id, 0.0)
+        if item_outstanding <= 1e-6:
+            continue
+        product = db.get(Product, item.product_id)
+        items.append(
+            optimizer.ItemRequest(
+                order_item_id=item.id,
+                product_id=item.product_id,
+                product_name=product.name if product else item.product_id,
+                requested_qty_base_unit=item_outstanding,
+                substitution_allowed=item.substitution_allowed,
+                base_unit=product.base_unit,
+            )
+        )
+        if offers_override is not None and item.product_id in offers_override:
+            offers_by_product[item.product_id] = offers_override[item.product_id]
+        else:
+            offers_by_product[item.product_id] = gather_offers(
+                db, item.product_id, merchant.latitude, merchant.longitude, preferred, excluded_offer_ids
+            )
+    if not items:
+        return None
+
+    committed = [a for a in plan.allocations if a.status not in EXCLUDED_TERMINAL_STATUSES and _effective_qty(a) > 0]
+    committed_ids = {a.supplier_id for a in committed}
+    for offers in offers_by_product.values():
+        for offer in offers:
+            pending = sum(_effective_qty(a) for a in committed if a.inventory_id == offer.offer_id and a.status == AllocationStatus.PROPOSED)
+            offer.stock_qty_base_unit = max(0, offer.stock_qty_base_unit - pending)
+    all_supplier_ids = {o.supplier_id for offers in offers_by_product.values() for o in offers}
+    capacities = _capacities(db, all_supplier_ids)
+    policy = optimizer.OptimizerPolicy(
+        objective_profile=plan.objective_profile,
+        budget_cap=max(0, order.budget_cap - plan.total_cost) if order.budget_cap is not None else None,
+        price_tolerance_pct=order.price_tolerance_pct,
+        min_reliability=order.min_reliability,
+        max_suppliers=order.max_suppliers,
+        committed_supplier_ids=committed_ids,
+        price_ceiling_by_product=initial_price_ceilings(order),
+    )
+    for sid, cap in capacities.items():
+        cap.delivery_capacity_kg_per_day = max(0, cap.delivery_capacity_kg_per_day - sum(_effective_qty(a) for a in committed if a.supplier_id == sid and a.product.base_unit == "kg"))
+    return items, offers_by_product, capacities, policy
+
+
+def initial_price_ceilings(order: Order) -> dict[str, float]:
+    return next((p.explanation.get("price_ceilings", {}) for p in order.plans if p.replan_reason == "initial"), {})
+
+
+def replan_after_event(
+    db: Session, order: Order, trigger_allocation: Allocation, reason: str,
+    offers_override: dict[str, list[optimizer.OfferCandidate]] | None = None,
+    keep_relay_id: str | None = None,
+) -> AllocationPlan:
+    """`offers_override` replaces the open-market offers for the given products (the
+    Supply Relay passes partner quotes here); every other rule is unchanged."""
+    from app.services.promise import log
 
     current_plan = get_selected_plan(order)
     if current_plan is None:
         raise ValueError("Order has no selected plan to replan from")
 
-    merchant = db.get(MerchantProfile, order.merchant_id)
-    excluded_offer_ids = _all_excluded_offer_ids(db, order)
-    preferred = set(order.preferred_supplier_ids or [])
+    # This replan covers the outstanding quantity itself, so any open relay for the
+    # order would double-source it: close the relay and say why.
+    for relay in open_relays(db, order):
+        if relay.id == keep_relay_id:
+            continue
+        relay.status = "superseded"
+        relay.resolution_note = f"Order replanned ({reason}); open-market recovery now covers the outstanding quantity"
+        relay.resolved_at = datetime.now(UTC)
+        log(db, "relay_superseded", order_id=order.id, relay_id=relay.id, supplier_id=relay.origin_supplier_id,
+            from_state="open", to_state="superseded", reason=relay.resolution_note)
 
-    # Determine outstanding quantity per order item.
-    outstanding_by_item: dict[str, float] = {}
-    for item in order.items:
-        secured = 0.0
-        for a in current_plan.allocations:
-            if a.order_item_id != item.id:
-                continue
-            if a.status in (AllocationStatus.CONFIRMED, AllocationStatus.FULFILLED, AllocationStatus.SHORT_SUPPLY):
-                secured += _effective_qty(a)
-            elif a.status == AllocationStatus.PROPOSED and a.id != trigger_allocation.id:
-                secured += a.allocated_qty_base_unit  # still pending, assume it will land
-        outstanding_by_item[item.id] = max(0.0, round(item.requested_qty_base_unit - secured, 3))
+    excluded_offer_ids = _all_excluded_offer_ids(db, order)
+
+    outstanding = outstanding_by_item(order, current_plan, exclude_allocation_id=trigger_allocation.id)
 
     new_plan = AllocationPlan(
         order_id=order.id,
@@ -306,6 +401,9 @@ def replan_after_event(
     )
     db.add(new_plan)
     db.flush()
+    # order.plans may already be loaded; without this, sync_order_status cannot see the
+    # new selected plan and silently leaves the order status unchanged.
+    db.expire(order, ["plans"])
 
     # Carry forward every non-superseded allocation from the old plan except the
     # trigger (which gets re-added in its final failed/short-supply state).
@@ -330,63 +428,26 @@ def replan_after_event(
             route_duration_minutes=a.route_duration_minutes,
             route_source=a.route_source,
             route_cost=a.route_cost,
+            fulfillment_stage=a.fulfillment_stage,
         )
         db.add(copy)
         carried_ids.add(a.id)
     current_plan.is_selected = False
     db.flush()
 
-    items = []
-    offers_by_product: dict[str, list[optimizer.OfferCandidate]] = {}
-    for item in order.items:
-        outstanding = outstanding_by_item[item.id]
-        if outstanding <= 1e-6:
-            continue
-        product = db.get(Product, item.product_id)
-        items.append(
-            optimizer.ItemRequest(
-                order_item_id=item.id,
-                product_id=item.product_id,
-                product_name=product.name if product else item.product_id,
-                requested_qty_base_unit=outstanding,
-                substitution_allowed=item.substitution_allowed,
-                base_unit=product.base_unit,
-            )
-        )
-        offers_by_product[item.product_id] = gather_offers(
-            db, item.product_id, merchant.latitude, merchant.longitude, preferred, excluded_offer_ids
-        )
-
-    if items:
-        db.refresh(new_plan)
-        recompute_plan_totals(db, new_plan)
-        committed = [a for a in new_plan.allocations if a.status not in EXCLUDED_TERMINAL_STATUSES and _effective_qty(a) > 0]
-        committed_ids = {a.supplier_id for a in committed}
-        for offers in offers_by_product.values():
-            for offer in offers:
-                pending = sum(_effective_qty(a) for a in committed if a.inventory_id == offer.offer_id and a.status == AllocationStatus.PROPOSED)
-                offer.stock_qty_base_unit = max(0, offer.stock_qty_base_unit - pending)
-        all_supplier_ids = {o.supplier_id for offers in offers_by_product.values() for o in offers}
-        capacities = _capacities(db, all_supplier_ids)
-        policy = optimizer.OptimizerPolicy(
-            objective_profile=new_plan.objective_profile,
-            budget_cap=max(0, order.budget_cap - new_plan.total_cost) if order.budget_cap is not None else None,
-            price_tolerance_pct=order.price_tolerance_pct,
-            min_reliability=order.min_reliability,
-            max_suppliers=order.max_suppliers,
-            committed_supplier_ids=committed_ids,
-            price_ceiling_by_product=next((p.explanation.get("price_ceilings", {}) for p in order.plans if p.replan_reason == "initial"), {}),
-        )
-        for sid, cap in capacities.items():
-            cap.delivery_capacity_kg_per_day = max(0, cap.delivery_capacity_kg_per_day - sum(_effective_qty(a) for a in committed if a.supplier_id == sid and a.product.base_unit == "kg"))
+    db.refresh(new_plan)
+    recompute_plan_totals(db, new_plan)
+    problem = build_recovery_problem(db, order, new_plan, outstanding, excluded_offer_ids, offers_override)
+    if problem is not None:
+        items, offers_by_product, capacities, policy = problem
         result = optimizer.solve_allocation(items, offers_by_product, capacities, policy)
         new_plan.is_feasible = result.is_feasible
         new_plan.infeasible_reasons = result.infeasible_reasons
-        new_plan.explanation = {"excluded_offers": result.excluded_offers, "outstanding_by_item": outstanding_by_item, "shortfall_by_item": result.shortfall_by_item, "budget_remaining_before_recovery": policy.budget_cap, "previous_plan_id": current_plan.id}
+        new_plan.explanation = {"excluded_offers": result.excluded_offers, "outstanding_by_item": outstanding, "shortfall_by_item": result.shortfall_by_item, "budget_remaining_before_recovery": policy.budget_cap, "previous_plan_id": current_plan.id}
         _persist_allocations(db, new_plan, result, {})
     else:
         new_plan.infeasible_reasons = []
-        new_plan.explanation = {"outstanding_by_item": outstanding_by_item}
+        new_plan.explanation = {"outstanding_by_item": outstanding}
 
     db.flush()
     db.refresh(new_plan)

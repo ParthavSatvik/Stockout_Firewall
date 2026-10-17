@@ -13,6 +13,7 @@ from app.routers import (
     allocations,
     auth,
     catalog,
+    continuity,
     intelligence,
     orders,
     payments,
@@ -50,6 +51,7 @@ app.include_router(payments.router)
 app.include_router(reconciliation.router)
 app.include_router(scenarios.router)
 app.include_router(admin.router)
+app.include_router(continuity.router)
 app.include_router(intelligence.router)
 
 
